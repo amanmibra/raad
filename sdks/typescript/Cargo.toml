@@ -1,0 +1,21 @@
+[package]
+name = "raad-node"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+description = "Native Node-API bindings for raad"
+repository = "https://github.com/amanmibra/raad"
+
+[lib]
+crate-type = ["cdylib"]
+test = false
+doctest = false
+
+[dependencies]
+raad = { path = "../..", default-features = false }
+napi = { version = "3", default-features = false, features = ["napi8"] }
+napi-derive = "3"
+
+[build-dependencies]
+napi-build = "2"

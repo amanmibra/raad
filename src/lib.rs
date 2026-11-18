@@ -2,8 +2,11 @@
 //! Network access occurs only in explicit sync and write operations.
 mod auth;
 mod github;
+#[cfg(feature = "mcp")]
 pub mod mcp;
 mod process;
+#[doc(hidden)]
+pub mod sdk;
 mod store;
 mod validation;
 

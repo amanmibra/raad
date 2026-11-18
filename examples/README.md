@@ -4,6 +4,10 @@ These examples show how to keep application data in Git and read it with raad. S
 
 Run commands from the **raad repository root**, after [installing raad](../README.md#try-it). raad reads committed files, so commit your edits before trying a change.
 
+## Add raad to your app
+
+Start with the [Python and TypeScript walkthrough](sdk/README.md) to embed raad in an application such as sopops. It shows installation, local reads, GitHub App credentials, and PR proposals. No raad CLI is needed for those examples.
+
 ## App config
 
 Keep settings in a JSON file that your team can review before a release.

@@ -11,8 +11,8 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - run: cargo fmt --check
-      - run: cargo clippy --locked --all-targets --all-features -- -D warnings
+      - run: cargo fmt --all --check
+      - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
       - run: cargo test --locked --all
       - name: Install pinned SOP compiler
         run: cargo install --git https://github.com/sopops-dev/sop --tag v0.1.1 --locked sop-cli

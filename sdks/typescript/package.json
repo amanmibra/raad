@@ -1,0 +1,55 @@
+{
+  "name": "@amanmibra/raad",
+  "version": "0.1.0",
+  "description": "Native Node.js and TypeScript SDK for validated Git-backed application data",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "binding.cjs",
+    "binding.d.cts",
+    "*.node",
+    "LICENSE",
+    "README.md",
+    "src/index.ts"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/amanmibra/raad.git",
+    "directory": "sdks/typescript"
+  },
+  "scripts": {
+    "build:native": "napi build --platform --release --js binding.cjs --dts binding.d.cts",
+    "build": "npm run build:native && tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.mjs",
+    "prepack": "npm run build",
+    "build:types": "tsc"
+  },
+  "napi": {
+    "binaryName": "raad",
+    "targets": [
+      "aarch64-apple-darwin",
+      "x86_64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu"
+    ]
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.10.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0"
+  }
+}

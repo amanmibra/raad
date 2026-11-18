@@ -4,7 +4,33 @@
 
 Keep your app's prompts, policies, SOPs, and config in Git. raad lets you read them locally and propose changes through pull requests.
 
-Your data gets version history, branches, and rollback from Git, plus reviews and CI from GitHub. Use raad as a Rust library, a CLI, or a local MCP server for agents.
+Your data gets version history, branches, and rollback from Git, plus reviews and CI from GitHub. Use raad from Rust, Python, or TypeScript, through the CLI, or as a local MCP server for agents.
+
+## Use it in your app
+
+The [Python and TypeScript SDKs](sdks/README.md) embed the Rust core. Your app needs Git, but no separate raad CLI or server. See the package guides for source installation; the packages aren't on PyPI/npm yet.
+
+Python:
+
+```python
+from raad import Repository
+
+repo = Repository("sopops-dev/sop", root="spec")
+repo.sync()
+print(repo.read("agent.schema.json").json())
+```
+
+TypeScript:
+
+```typescript
+import { Repository } from '@amanmibra/raad';
+
+const repo = await Repository.open({repository: 'sopops-dev/sop', root: 'spec'});
+await repo.sync();
+console.log((await repo.read('agent.schema.json')).json());
+```
+
+For sopops and other async hosts, follow the [application walkthrough](examples/sdk/README.md). Rust apps can use the [library directly](examples/local.rs).
 
 ## Try it
 

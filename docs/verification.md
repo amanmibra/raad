@@ -36,3 +36,9 @@ These are synthetic local-network measurements, not a GitHub latency promise. Th
 - History is retained validated snapshots. PRs always use new proposal branches; updating existing PRs is deferred. No LFS, symlink, or submodule support.
 - Validation commands are trusted host executables, not sandboxed plugins. Streaming Git fetch can temporarily exceed cache budgets; use OS quotas for hard limits.
 - Registry metadata and release workflows are included, but no crate, tag, release, or registry listing was published.
+
+## Native SDK verification
+
+Python and TypeScript/Node SDKs embed the core through PyO3 and Node-API. Each has nine integration tests covering scoped/pinned reads, binary data, explicit sync, invalid candidate recovery, token refresh/redaction, authenticated multi-file PRs, direct expected-head writes, read-only permissions, typed errors, schema/symlink rejection, and event-loop responsiveness. The built Python stable-ABI wheel and npm tarball are installed into clean consumers; the Node consumer reads the cache created by Python without syncing. The Python source distribution is also rebuilt into a wheel. The stable-ABI wheel passes on Python 3.10 and 3.12; the Node package also runs on Node 20. Both native SDKs completed live public reads of sopops-dev/sop/spec at the commit recorded above.
+
+SDK package tests and examples run locally on macOS arm64. The Native SDKs workflow builds and tests Linux x86-64 and macOS arm64, including Python 3.10/3.12 and Node 22. Additional architectures, Windows, musl Linux, and browser/edge runtimes are not verified. The SDK packages have not been published to PyPI or npm. Actual private GitHub credentials and live mutations remain subject to the limitations above.

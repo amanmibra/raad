@@ -255,6 +255,13 @@ impl Mount {
     pub fn config(&self) -> &MountConfig {
         &self.config
     }
+    /// Clone this mount with credentials for one operation, without changing its cache or state.
+    pub fn with_credentials(&self, credentials: Credentials) -> Self {
+        Self {
+            credentials,
+            ..self.clone()
+        }
+    }
     pub fn cache_directory(&self) -> &Path {
         &self.directory
     }

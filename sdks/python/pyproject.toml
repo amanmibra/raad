@@ -1,0 +1,19 @@
+[build-system]
+requires = ["maturin>=1.9,<2"]
+build-backend = "maturin"
+
+[project]
+name = "raad"
+version = "0.1.0"
+description = "Native Python SDK for validated Git-backed application data"
+requires-python = ">=3.10"
+readme = "README.md"
+license = "Apache-2.0"
+
+[project.urls]
+Repository = "https://github.com/amanmibra/raad"
+
+[tool.maturin]
+python-source = "python"
+module-name = "raad._native"
+features = ["pyo3/extension-module"]

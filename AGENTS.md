@@ -24,7 +24,7 @@ You are implementing raad v0.1 from [DESIGN.md](DESIGN.md), with supporting huma
 5. Add CLI and read-only-by-default stdio MCP, reusing core logic.
 6. Add sopops integration fixture, security tests, CI, and distribution assets.
 
-Run `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, and `cargo test --all` when the workspace supports them. Run focused tests after each vertical slice.
+Run `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, and `cargo test --all` when the workspace supports them. Run focused tests after each vertical slice.
 
 ## Required documentation changes
 
@@ -37,3 +37,7 @@ Every documented command must be executable before calling the feature done. Upd
 Test path traversal, symlink escapes, mount bounds, cache corruption, fresh-start failures, validation rejection, stale write conflicts, read-only MCP permissions, and private token leakage. Confirm raad APIs do not expose unrelated mounted-out paths even if repository metadata is cached.
 
 Do not modify the `sop` or `sopops` projects as part of this repository's v0.1 implementation.
+
+## Native SDKs
+
+Python and Node bindings in `sdks/` must call the Rust core in-process. Keep caching, validation, permissions, and provider behavior in the core. Preserve SDK API parity, explicit sync, typed errors, credential redaction, and nonblocking async interfaces. Follow [SDK checks](sdks/README.md#build-and-verify), including clean wheel/npm consumers. Do not claim registry publication or untested binary targets.

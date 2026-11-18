@@ -1,0 +1,60 @@
+name: Native SDKs
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  packages:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: sdks/typescript/package-lock.json
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: sdk-packages
+      - run: python -m pip install 'maturin>=1.9,<2'
+      - name: Build Python wheel
+        run: maturin build --release --locked --manifest-path sdks/python/Cargo.toml --out dist/python
+      - name: Test Python package
+        run: |
+          python -m pip install dist/python/*.whl
+          python -m unittest discover -s sdks/python/tests -v
+          python examples/sdk/python_app.py
+      - name: Build and test Node package
+        run: |
+          npm ci --prefix sdks/typescript
+          npm run build --prefix sdks/typescript
+          npm test --prefix sdks/typescript
+          mkdir -p dist/typescript
+          npm pack ./sdks/typescript --pack-destination "$GITHUB_WORKSPACE/dist/typescript"
+      - name: Check the TypeScript app example
+        run: |
+          npm ci --prefix examples/sdk
+          npm run typecheck --prefix examples/sdk
+          npm start --prefix examples/sdk
+      - name: Test clean installed consumers and shared cache
+        run: python scripts/test_sdk_packages.py --wheel dist/python/*.whl --npm-package dist/typescript/*.tgz
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Verify the stable-ABI wheel on minimum Python
+        run: |
+          python -m pip install dist/python/*.whl
+          python -m unittest discover -s sdks/python/tests -v
+      - uses: actions/upload-artifact@v4
+        with:
+          name: raad-sdks-${{ runner.os }}-${{ runner.arch }}
+          path: |
+            dist/python/*.whl
+            dist/typescript/*.tgz

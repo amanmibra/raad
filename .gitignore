@@ -3,3 +3,13 @@
 *.log
 .env
 /dist/
+**/dist/
+**/node_modules/
+**/__pycache__/
+**/.venv/
+*.so
+*.node
+*.tgz
+*.egg-info/
+/sdks/typescript/binding.cjs
+/sdks/typescript/binding.d.cts

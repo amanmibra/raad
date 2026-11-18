@@ -51,3 +51,7 @@ A warm persisted cache survives failed fetches and invalid candidates using its 
 When handing off a proposal, report repository/mount, expected SHA, files changed, validation outcome, PR URL, and review still needed. If data is stale or a candidate was rejected, say so. Examples: “Find the refund procedure and report the active commit”; “Propose an escalation update without merging”; “Check sync and validation status before publishing.”
 
 See [human README](../../README.md), [MCP setup](../mcp.md), [security](../security.md), and [configuration](../configuration.md).
+
+## Embedding in an application
+
+Host applications can use the [Python or TypeScript SDKs](../../sdks/README.md), which embed the Rust core without the raad CLI. Python offers sync/async interfaces; Node methods return promises. Use explicit sync, persistent caches, commit-pinned reads, and host-supplied token callbacks. SDK writes require mount authorization; MCP permission boundaries remain unchanged. See the [application walkthrough](../../examples/sdk/README.md).

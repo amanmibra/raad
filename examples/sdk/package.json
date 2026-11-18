@@ -1,0 +1,8 @@
+{
+  "name": "raad-app-example",
+  "private": true,
+  "type": "module",
+  "scripts": {"start": "tsx typescript_app.ts", "typecheck": "tsc --noEmit"},
+  "dependencies": {"@amanmibra/raad": "file:../../sdks/typescript"},
+  "devDependencies": {"@types/node": "^22.0.0", "tsx": "^4.20.0", "typescript": "^5.9.0"}
+}

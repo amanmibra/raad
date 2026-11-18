@@ -1,6 +1,6 @@
 # Architecture
 
-raad is one Rust crate with a reusable synchronous library and one CLI binary. The binary's `mcp` command uses the official Rust MCP SDK over stdio. Git operations use the installed Git CLI. Narrow GitHub REST requests create PRs; GraphQL provides atomic direct commits. There is no HTTP listener, database, daemon, or separate review engine.
+raad has a reusable synchronous Rust core, one CLI binary, and small native binding crates for Python and Node.js. The native SDKs embed the core and need no raad executable; Git remains an external dependency. CLI/MCP dependencies are optional Cargo features, excluded from the SDK builds. The binary's `mcp` command uses the official Rust MCP SDK over stdio. Git operations use the installed Git CLI. Narrow GitHub REST requests create PRs; GraphQL provides atomic direct commits. There is no HTTP listener, database, daemon, or separate review engine.
 
 ## Read and sync model
 
@@ -29,3 +29,9 @@ If a snapshot checksum fails, reads fail visibly. Explicit `sync` can reconstruc
 ## Deliberate v0.1 choices
 
 History means retained validated snapshots, not every historical Git commit. Fetch a full SHA explicitly to make another revision available. There is no automatic background refresh, schema discovery, repository-supplied command execution, PR merging, semantic search, hosted OAuth, or remote MCP transport. Each proposal creates a new branch/PR; updating an existing PR is deferred. Rate limits are returned with retry timing; the host controls retry/backoff.
+
+## Application SDKs
+
+The shared internal binding surface dispatches typed SDK operations to the same `Mount` methods used by Rust and the CLI. Python uses PyO3, stable-ABI wheels, and typed Python result objects; Node uses Node-API, promises, and TypeScript declarations. The small JSON boundary is in-process; there is no RPC service or subprocess invocation of raad. Python releases the GIL; Node executes work on its native worker pool. Async Python also moves native calls off the event loop.
+
+Credentials are supplied per sync/write operation. Host token callbacks run in the language wrapper before native work; a temporary mount clone receives that token without changing cache identity or persisting credentials. Reads do not resolve a token or sync implicitly. Normal core write authorization still applies. Caches are interoperable across Rust, CLI, Python, and Node with the same mount and validation settings. See [SDK installation and runtime behavior](../sdks/README.md).
