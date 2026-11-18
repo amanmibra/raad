@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.sopops-dev/raad",
+  "name": "io.github.amanmibra/raad",
   "description": "Scoped, validated Git-backed application data over local stdio MCP.",
-  "repository": {"url": "https://github.com/sopops-dev/raad", "source": "github"},
+  "repository": {"url": "https://github.com/amanmibra/raad", "source": "github"},
   "version": "0.1.0",
   "_meta": {
     "io.modelcontextprotocol.registry/publisher-provided": {

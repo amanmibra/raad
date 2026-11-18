@@ -1,1 +1,7 @@
-{"region":"us-east-1","features":{"refunds":true},"retry_limit":3}
+{
+  "region": "us-east-1",
+  "features": {
+    "refunds": true
+  },
+  "retry_limit": 3
+}

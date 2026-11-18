@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.94"
 description = "Commit-pinned, validated Git-backed application data"
 license = "Apache-2.0"
-repository = "https://github.com/sopops-dev/raad"
+repository = "https://github.com/amanmibra/raad"
 
 [dependencies]
 base64 = "0.22"
