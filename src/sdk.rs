@@ -3,7 +3,7 @@
 use crate::{Credentials, Error, Limits, Mount, MountConfig, Result, Validation, WriteRequest};
 use serde::Deserialize;
 use serde_json::{Value, json};
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
 #[derive(Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -46,6 +46,8 @@ enum Call {
     Sync {
         #[serde(default)]
         revision: Option<String>,
+        #[serde(default)]
+        token_provider_failed: bool,
     },
     Read {
         path: String,
@@ -136,13 +138,25 @@ impl Repository {
     pub fn call(&self, request: &str, token: Option<String>) -> Result<String> {
         let request: Call = serde_json::from_str(request)
             .map_err(|_| Error::Config("invalid SDK operation".into()))?;
-        let mount = if let Some(token) = token {
+        let mut mount = if let Some(token) = token {
             self.mount.with_credentials(Credentials::token(token))
         } else {
             self.mount.clone()
         };
         let result: Value = match request {
-            Call::Sync { revision } => serde_json::to_value(mount.sync(revision.as_deref())?)?,
+            Call::Sync {
+                revision,
+                token_provider_failed,
+            } => {
+                if token_provider_failed {
+                    // Run through the normal sync failure path so cached status also
+                    // records host callback failures without exposing their messages.
+                    mount = mount.with_credentials(Credentials::Provider(Arc::new(|_: &str| {
+                        Err(Error::Permission("token provider failed".into()))
+                    })));
+                }
+                serde_json::to_value(mount.sync(revision.as_deref())?)?
+            }
             Call::Read { path, revision } => {
                 serde_json::to_value(mount.read(&path, revision.as_deref())?)?
             }

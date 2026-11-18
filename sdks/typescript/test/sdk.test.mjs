@@ -108,6 +108,8 @@ test('write permissions and callback failures are safe', async t => {
   await assert.rejects(repo.commit([{operation: 'delete', path: 'policy.md'}], options), PermissionDeniedError);
   const broken = await f.remote({tokenProvider: () => {throw new Error('secret-token-must-not-leak');}});
   await assert.rejects(broken.sync(), error => error instanceof PermissionDeniedError && !error.message.includes('secret-token'));
+  assert.equal((await broken.status()).stale, true);
+  assert.match((await broken.status()).lastError, /token provider failed/);
 });
 
 test('authenticated multi-file PR and atomic direct commit', async t => {

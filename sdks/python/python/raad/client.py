@@ -55,6 +55,7 @@ class Repository:
         except RuntimeError as error:
             raise native_error(error) from None
         self._token_provider = token_provider
+        self._remote = repository is not None
 
     def _call_native(self, request: dict[str, Any], token: str | None) -> Any:
         try:
@@ -64,11 +65,13 @@ class Repository:
 
     def _call(self, request: dict[str, Any]) -> Any:
         token = None
-        if request["method"] in ("sync", "propose") and self._token_provider is not None:
+        if self._remote and request["method"] in ("sync", "propose") and self._token_provider is not None:
             try:
                 token = _check_token(self._token_provider())
             except Exception:
-                raise PermissionDeniedError("token provider failed") from None
+                if request["method"] != "sync":
+                    raise PermissionDeniedError("token provider failed") from None
+                request["token_provider_failed"] = True
         return self._call_native(request, token)
 
     def sync(self, revision: str | None = None) -> Status:
@@ -136,13 +139,15 @@ class AsyncRepository:
 
     async def _call(self, request: dict[str, Any]) -> Any:
         token = None
-        if request["method"] in ("sync", "propose") and self._token_provider is not None:
+        if self._repository._remote and request["method"] in ("sync", "propose") and self._token_provider is not None:
             try:
                 # Blocking providers also run off the host's event loop.
                 value = await asyncio.to_thread(self._token_provider)
                 token = _check_token(await value if inspect.isawaitable(value) else value)
             except Exception:
-                raise PermissionDeniedError("token provider failed") from None
+                if request["method"] != "sync":
+                    raise PermissionDeniedError("token provider failed") from None
+                request["token_provider_failed"] = True
         return await asyncio.to_thread(self._repository._call_native, request, token)
 
     async def sync(self, revision: str | None = None) -> Status:

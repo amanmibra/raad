@@ -130,7 +130,7 @@ export class ReadResult {
 
 /** A mounted repository. Opening and reads never synchronize implicitly. */
 export class Repository {
-  private constructor(private readonly native: NativeRepository, private readonly tokenProvider?: TokenProvider) {}
+  private constructor(private readonly native: NativeRepository, private readonly tokenProvider?: TokenProvider, private readonly remote = false) {}
 
   static async open(options: RepositoryOptions = {}): Promise<Repository> {
     if (options.anonymous && options.tokenProvider) {
@@ -152,17 +152,21 @@ export class Repository {
         validation, limits, allow_proposals: options.allowProposals, allow_direct: options.allowDirect,
         anonymous: options.anonymous, github_api_url: options.githubApiUrl,
       }));
-      return new Repository(native, options.tokenProvider);
+      return new Repository(native, options.tokenProvider, typeof options.repository === "string");
     } catch (error) { throw nativeError(error); }
   }
 
   private async call<T>(request: Record<string, unknown>): Promise<T> {
     let token: string | undefined;
-    if ((request.method === "sync" || request.method === "propose") && this.tokenProvider) {
+    if (this.remote && (request.method === "sync" || request.method === "propose") && this.tokenProvider) {
       try {
         token = await this.tokenProvider();
         if (typeof token !== "string" || !token || /[\r\n\0]/.test(token)) throw new Error();
-      } catch { throw new PermissionDeniedError("token provider failed", "permission_denied"); }
+      } catch {
+        if (request.method !== "sync") throw new PermissionDeniedError("token provider failed", "permission_denied");
+        token = undefined;
+        request.token_provider_failed = true;
+      }
     }
     try { return JSON.parse(await this.native.call(JSON.stringify(request), token)) as T; }
     catch (error) { throw nativeError(error, token); }

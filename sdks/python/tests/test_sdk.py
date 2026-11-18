@@ -182,6 +182,8 @@ class RepositoryTests(unittest.TestCase):
             repo.sync()
         self.assertNotIn("secret-token", str(error.exception))
         self.assertIsNone(error.exception.__cause__)
+        self.assertTrue(repo.status().stale)
+        self.assertIn("token provider failed", repo.status().last_error)
 
     def test_authenticated_multi_file_proposal_and_direct_commit(self):
         base = git(self.f.repo, "rev-parse", "HEAD")
@@ -285,6 +287,17 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(calls), 1)
         await repo.sync()
         self.assertEqual(len(calls), 2)
+
+        async def broken():
+            raise RuntimeError("async-secret-must-not-leak")
+
+        broken_repo = await AsyncRepository.open("fixture/private", root="data", branch="main",
+                                                 cache_dir=f.cache, token_provider=broken)
+        with self.assertRaises(PermissionDeniedError) as error:
+            await broken_repo.sync()
+        self.assertNotIn("async-secret", str(error.exception))
+        self.assertTrue((await broken_repo.status()).stale)
+        self.assertIn("token provider failed", (await broken_repo.status()).last_error)
 
 
 if __name__ == "__main__":

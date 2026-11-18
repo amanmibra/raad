@@ -26,7 +26,7 @@ Start with the [application walkthrough](../examples/sdk/README.md). It includes
 - Read results include bytes, commit provenance, and staleness. Pass a retained full SHA to keep multiple reads at the same commit.
 - Invalid candidates don't replace the last valid copy. A failed first sync leaves no copy to serve.
 - Writes need `allow_proposals`/`allowProposals` or `allow_direct`/`allowDirect`, plus an explicit proposal or commit call. Supply the expected base SHA.
-- Token callbacks run only for explicit sync/write calls. They can reuse the host's existing GitHub App token cache. Missing callbacks use existing local credentials.
+- Token callbacks run only for explicit sync/write calls. They can reuse the host's existing GitHub App token cache. Missing callbacks use existing local credentials. A failed callback marks sync status stale and preserves the prior snapshot.
 - Validation settings are trusted host configuration; fetched files can't register commands. [Validation details](../docs/validation.md).
 
 A mounted folder limits what raad exposes, not all Git downloads or metadata. Use a dedicated data repo for strict minimization. [Cache and privacy](../docs/architecture.md).
