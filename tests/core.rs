@@ -57,6 +57,8 @@ fn local_committed_scoped_pinned_reads_and_search() {
 #[test]
 fn hostile_paths_are_rejected() {
     for path in [
+        "/",
+        "///",
         "../secret",
         "/etc/passwd",
         "a/../../b",
@@ -71,6 +73,7 @@ fn hostile_paths_are_rejected() {
         "a./x",
     ] {
         assert!(safe_path(path, false).is_err(), "{path:?}");
+        assert!(safe_path(path, true).is_err(), "mount root {path:?}");
     }
     let f = Fixture::new();
     f.mount.sync(None).unwrap();

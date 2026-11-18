@@ -53,6 +53,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Strict portable paths: no traversal, absolute paths, Git metadata or platform aliases.
 pub fn safe_path(value: &str, allow_empty: bool) -> Result<String> {
+    // Check before trimming: '/' must not become an empty, repository-wide mount.
+    if value.starts_with('/') {
+        return Err(Error::InvalidPath(value.into()));
+    }
     let value = value.trim_end_matches('/');
     if value.is_empty() && allow_empty {
         return Ok(String::new());
