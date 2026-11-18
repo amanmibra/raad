@@ -403,16 +403,15 @@ impl Mount {
         self.check_cache_size()?;
         let mut token = None;
         let branch;
-        let sha;
-        match &self.config.source {
+        let sha = match &self.config.source {
             Source::Local { .. } => {
                 branch = self.config.branch.clone().unwrap_or_else(|| "HEAD".into());
                 let target = revision.unwrap_or(&branch);
-                sha = self.text_git(
+                self.text_git(
                     &["rev-parse", "--verify", &format!("{target}^{{commit}}")],
                     false,
                     None,
-                )?;
+                )?
             }
             Source::Github { repository } => {
                 token = self.credentials.resolve(repository)?;
@@ -485,13 +484,13 @@ impl Mount {
                 .map_err(|_| {
                     Error::Remote("fetch failed (check credentials, network and branch)".into())
                 })?;
-                sha = self.text_git(
+                self.text_git(
                     &["rev-parse", "--verify", "FETCH_HEAD^{commit}"],
                     false,
                     None,
-                )?;
+                )?
             }
-        }
+        };
         if !valid_sha(&sha) {
             return Err(Error::Corrupt("Git returned invalid SHA".into()));
         }
