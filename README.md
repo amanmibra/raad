@@ -1,6 +1,8 @@
-# raad
+# 🤙 raad
 
 **Your repo is your database. Git is your infrastructure.**
+
+Pronounced **rad**. Short for **repo as a db**.
 
 raad v0.1 is a Rust library, CLI, and local stdio MCP server for read-heavy application data: instructions, SOPs, policies, prompts, and configuration. Git owns commits, branches, history, and rollback. GitHub owns PRs, review, permissions, branch protection, and CI. raad supplies scoped local reads, validated snapshots, and GitHub change proposals.
 
