@@ -254,6 +254,18 @@ class AsyncTests(unittest.IsolatedAsyncioTestCase):
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
 
+    async def test_host_subprocesses_can_run_alongside_native_git(self):
+        f = await asyncio.to_thread(Fixture)
+        self.addCleanup(f.temp.cleanup)
+        repo = await AsyncRepository.open(local_path=f.repo, root="data", cache_dir=f.cache)
+        for _ in range(3):
+            child = await asyncio.create_subprocess_exec(
+                sys.executable, "-c", "print('host child')", stdout=asyncio.subprocess.PIPE,
+            )
+            _, output = await asyncio.gather(repo.sync(), child.communicate())
+            self.assertEqual(output[0].strip(), b"host child")
+            self.assertEqual(child.returncode, 0)
+
     async def test_async_token_provider_refresh_and_cached_reads(self):
         f = await asyncio.to_thread(Fixture)
         self.addCleanup(f.temp.cleanup)

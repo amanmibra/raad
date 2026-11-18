@@ -3,9 +3,8 @@ use std::{
     io::{Read, Write},
     process::{Command, Stdio},
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
-use wait_timeout::ChildExt;
 
 // Drain pipes even after the output budget is reached, so children cannot deadlock.
 pub(crate) fn run(
@@ -55,7 +54,18 @@ pub(crate) fn run(
     }
     let out = drain(child.stdout.take().unwrap(), limit);
     let err = drain(child.stderr.take().unwrap(), 8192);
-    let status = child.wait_timeout(Duration::from_secs(timeout))?;
+    // Embedding hosts such as Node/libuv and asyncio own their SIGCHLD handling.
+    // Poll this child directly instead of installing a process-global signal handler.
+    let started = Instant::now();
+    let status = loop {
+        if let Some(status) = child.try_wait()? {
+            break Some(status);
+        }
+        if started.elapsed() >= Duration::from_secs(timeout) {
+            break None;
+        }
+        thread::sleep(Duration::from_millis(5));
+    };
     #[cfg(unix)]
     {
         // Kill descendants as well, including validators that leave background pipe holders.

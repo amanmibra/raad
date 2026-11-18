@@ -161,3 +161,16 @@ test('schema validation and symlinks use the Rust security boundary', async t =>
     await assert.rejects((await f.local()).sync(), ValidationError);
   }
 });
+
+test('host subprocesses remain usable between native Git operations', async t => {
+  const f = fixture(t);
+  // Node/libuv reconfigures child handling when it starts its own subprocesses.
+  // A native library must not depend on owning that process-global signal handler.
+  for (let i = 0; i < 3; i++) {
+    const repo = await f.local();
+    await repo.sync();
+    assert.equal(git(f.repo, 'rev-parse', 'HEAD'), (await repo.status()).activeSha);
+    const reopened = await f.local();
+    assert.equal((await reopened.read('settings.json')).json().enabled, true);
+  }
+});
