@@ -1,0 +1,25 @@
+{
+  "manifest_version": "0.3",
+  "name": "raad",
+  "version": "0.1.0",
+  "description": "Read validated Git data mounts and propose reviewed changes over local stdio MCP.",
+  "author": {"name": "raad contributors"},
+  "license": "Apache-2.0",
+  "server": {
+    "type": "binary",
+    "entry_point": "server/raad",
+    "mcp_config": {
+      "command": "${__dirname}/server/raad",
+      "args": ["mcp", "--config", "${user_config.config_path}"]
+    }
+  },
+  "tools_generated": true,
+  "user_config": {
+    "config_path": {
+      "type": "string",
+      "title": "Trusted raad configuration",
+      "description": "Absolute path to your trusted raad.yaml allowlist. Keep writes disabled unless intended.",
+      "required": true
+    }
+  }
+}

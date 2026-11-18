@@ -1,0 +1,5 @@
+livekit: support
+context: You are a customer support assistant.
+blocks:
+  - voice
+  - refunds

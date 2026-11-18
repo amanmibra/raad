@@ -1,0 +1,20 @@
+name: CI
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets --all-features -- -D warnings
+      - run: cargo test --locked --all
+      - name: Install pinned SOP compiler
+        run: cargo install --git https://github.com/sopops-dev/sop --tag v0.1.1 --locked sop-cli
+      - run: RAAD_REQUIRE_SOP=1 cargo test --locked --test examples
+      - run: python3 scripts/benchmark.py

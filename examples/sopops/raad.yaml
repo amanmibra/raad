@@ -1,0 +1,13 @@
+version: 1
+mounts:
+  - name: sops
+    source:
+      kind: local
+      path: .
+    path: examples/sopops/sops
+    validation:
+      syntax: true
+      commands:
+        - name: sop
+          command: [sop, validate, --dir, .]
+          timeout_seconds: 30

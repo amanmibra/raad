@@ -1,0 +1,14 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.sopops-dev/raad",
+  "description": "Scoped, validated Git-backed application data over local stdio MCP.",
+  "repository": {"url": "https://github.com/sopops-dev/raad", "source": "github"},
+  "version": "0.1.0",
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "status": "Unpublished source-install metadata; configure ownership and published package before registry submission.",
+      "sourceInstall": "cargo install --path . --locked",
+      "localStdio": {"command": "raad", "args": ["mcp", "--config", "/absolute/path/to/trusted/raad.yaml"]}
+    }
+  }
+}

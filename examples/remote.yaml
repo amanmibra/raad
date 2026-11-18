@@ -1,0 +1,13 @@
+# Pass explicitly using --config. Edit the repository to your own before writing.
+version: 1
+mounts:
+  - name: sops
+    source:
+      kind: github
+      repository: acme/livekit-agent
+    branch: main
+    path: sops
+    refresh_seconds: 60
+    allow_proposals: false
+    validation:
+      syntax: true
