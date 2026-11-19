@@ -1,6 +1,6 @@
 # Verification record
 
-Implementation verified on macOS arm64 with Rust 1.94.0, Cargo 1.94.0, and Git 2.45.2. This is the first raad v0.1 implementation from the supplied design v0.2, not an upgrade of existing software.
+Initial implementation verified on macOS arm64 with Rust 1.94.0, Cargo 1.94.0, and Git 2.45.2. Release and SDK checks also run in CI on the supported platforms below.
 
 ## Automated acceptance
 
@@ -32,13 +32,17 @@ These are synthetic local-network measurements, not a GitHub latency promise. Th
 - Live private repository access and live GitHub PR/direct commits were not performed. Authenticated mocks cover the adapters; token scope, installation grants, branch protections, and real provider behavior still need a deployment-specific acceptance run on an authorized disposable repository.
 - Fine-grained PAT/App token strings share the same production adapter. Actual App token mint/refresh is delegated to the host; tests verify callback refresh and failure redaction.
 - MCP stdio protocol and dispatcher were tested. Codex, Claude Code, and Cursor GUI registration were not automated here.
-- Linux CI is configured, while Windows process-tree cleanup and filesystem permission behavior were not verified. Unix process-group cleanup is tested.
+- Linux x86-64 and macOS arm64 CI cover the core and SDKs. Windows process-tree cleanup and filesystem permission behavior were not verified. Unix process-group cleanup is tested.
 - History is retained validated snapshots. PRs always use new proposal branches; updating existing PRs is deferred. No LFS, symlink, or submodule support.
 - Validation commands are trusted host executables, not sandboxed plugins. Streaming Git fetch can temporarily exceed cache budgets; use OS quotas for hard limits.
-- Registry metadata and release workflows are included, but no crate, tag, release, or registry listing was published.
+- The Rust crate and MCP registry metadata are not published to their registries. CLI/MCP downloads are distributed through GitHub Releases; Python and Node SDKs use PyPI and npm as well as direct release downloads.
 
 ## Native SDK verification
 
 Python and TypeScript/Node SDKs embed the core through PyO3 and Node-API. Each has ten integration tests covering scoped/pinned reads, binary data, explicit sync, invalid candidate recovery, token refresh/redaction, authenticated multi-file PRs, direct expected-head writes, read-only permissions, typed errors, schema/symlink rejection, event-loop responsiveness, and coexistence with host subprocess handling. The built Python stable-ABI wheel and npm tarball are installed into clean consumers; the Node consumer reads the cache created by Python without syncing. The Python source distribution is also rebuilt into a wheel. The stable-ABI wheel passes on Python 3.10 and 3.12; the Node package also runs on Node 20. Both native SDKs completed live public reads of sopops-dev/sop/spec at the commit recorded above.
 
-SDK package tests and examples run locally on macOS arm64. The Native SDKs workflow builds and tests Linux x86-64 and macOS arm64, including Python 3.10/3.12 and Node 22. Additional architectures, Windows, musl Linux, and browser/edge runtimes are not verified. The SDK packages have not been published to PyPI or npm. Actual private GitHub credentials and live mutations remain subject to the limitations above.
+SDK package tests and examples run locally on macOS arm64. The Native SDKs workflow builds and tests Linux x86-64 and macOS arm64, including Python 3.10/3.12 and Node 22. Additional architectures, Windows, musl Linux, and browser/edge runtimes are not verified. Actual private GitHub credentials and live mutations remain subject to the limitations above.
+
+## Release installation
+
+The release workflow requires formatting, linting, core/integration tests, native SDK tests, clean consumer checks, and version agreement before publishing assets. It publishes the same tested wheels to PyPI. A combined npm tarball contains both tested native modules and identical JavaScript/types, with automatic platform selection. `SHA256SUMS` covers every GitHub Release asset. Post-publication jobs download public URLs without a GitHub token, verify checksums, run the CLI, and test the installed SDKs and shared cache on both supported platforms. See [installation](installation.md) for exact platform and libc requirements.

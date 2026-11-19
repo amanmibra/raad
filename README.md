@@ -8,7 +8,12 @@ Your data gets version history, branches, and rollback from Git, plus reviews an
 
 ## Use it in your app
 
-The [Python and TypeScript SDKs](sdks/README.md) embed the Rust core. Your app needs Git, but no separate raad CLI or server. See the package guides for source installation; the packages aren't on PyPI/npm yet.
+The [Python and TypeScript SDKs](sdks/README.md) embed the Rust core. Your app needs Git, but no separate raad CLI or server. Prebuilt packages need no Rust compiler; see [supported platforms and direct downloads](docs/installation.md).
+
+```sh
+pip install raad
+npm install @amanmibra/raad
+```
 
 Python:
 
@@ -34,7 +39,9 @@ For sopops and other async hosts, follow the [application walkthrough](examples/
 
 ## Try it
 
-Requires Rust 1.94+ and Git 2.45+.
+Download the CLI from [GitHub Releases](https://github.com/amanmibra/raad/releases/latest) and follow the [installation guide](docs/installation.md#cli-and-local-mcp-server).
+
+To build from source, install Rust 1.94+ and Git 2.45+, then run:
 
 ```sh
 git clone https://github.com/amanmibra/raad.git

@@ -1,5 +1,10 @@
 name: Native SDKs
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 jobs:
@@ -7,7 +12,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-15]
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: macos-15
+            target: aarch64-apple-darwin
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +47,7 @@ jobs:
           npm test --prefix sdks/typescript
           mkdir -p dist/typescript
           npm pack ./sdks/typescript --pack-destination "$GITHUB_WORKSPACE/dist/typescript"
+          mv dist/typescript/amanmibra-raad-*.tgz "dist/typescript/raad-node-$(node -p 'require("./sdks/typescript/package.json").version')-${{ matrix.target }}.tgz"
       - name: Check the TypeScript app example
         run: |
           npm ci --prefix examples/sdk

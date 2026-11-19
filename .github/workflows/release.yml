@@ -1,15 +1,37 @@
-name: Release artifacts
+name: GitHub Release
 on:
   push:
     tags: ['v*']
 permissions:
   contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
-  build:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check release versions
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python scripts/prepare_release.py --tag "$RELEASE_TAG"
+  checks:
+    needs: version
+    uses: ./.github/workflows/ci.yml
+  sdks:
+    needs: version
+    uses: ./.github/workflows/sdks.yml
+  cli:
+    needs: version
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
           - os: macos-15
             target: aarch64-apple-darwin
@@ -17,21 +39,159 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
         with:
-          targets: ${{ matrix.target }}
-      - run: cargo build --release --locked --target ${{ matrix.target }}
-      - name: Package
+          key: release-cli
+      - run: cargo build --release --locked
+      - run: target/release/raad --version
+      - name: Package CLI and MCP bundle
+        env:
+          RELEASE_TARGET: ${{ matrix.target }}
         run: |
-          mkdir dist
-          cp target/${{ matrix.target }}/release/raad dist/
-          cp LICENSE README.md dist/
-          tar -czf raad-${{ matrix.target }}.tar.gz -C dist .
-          shasum -a 256 raad-${{ matrix.target }}.tar.gz > raad-${{ matrix.target }}.sha256
-      - run: python3 scripts/package.py --binary target/${{ matrix.target }}/release/raad --output raad-${{ matrix.target }}.mcpb
+          mkdir -p dist/cli dist/release
+          cp target/release/raad LICENSE README.md dist/cli/
+          tar -czf "dist/release/raad-${RELEASE_TARGET}.tar.gz" -C dist/cli .
+          python3 scripts/package.py --binary target/release/raad --output "dist/release/raad-${RELEASE_TARGET}.mcpb"
       - uses: actions/upload-artifact@v4
         with:
-          name: raad-${{ matrix.target }}
+          name: raad-cli-${{ matrix.target }}
           path: |
-            raad-*.tar.gz
-            raad-*.sha256
-            raad-*.mcpb
+            dist/release/*.tar.gz
+            dist/release/*.mcpb
+          if-no-files-found: error
+  assemble:
+    needs: [checks, sdks, cli]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: raad-sdks-*
+          path: dist/downloads
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: raad-cli-*
+          path: dist/downloads
+          merge-multiple: true
+      - name: Verify assets and generate checksums
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python scripts/prepare_release.py --tag "$RELEASE_TAG" --assets dist/downloads --output dist/release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: raad-release-assets
+          path: dist/release/*
+          if-no-files-found: error
+  verify:
+    needs: assemble
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --prefix sdks/typescript
+      - uses: actions/download-artifact@v4
+        with:
+          name: raad-release-assets
+          path: dist/release
+      - name: Verify staged CLI and SDK packages
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python scripts/test_release.py --tag "$RELEASE_TAG" --assets dist/release --output dist/release-install
+          python scripts/test_sdk_packages.py --wheel dist/release-install/*.whl --npm-package dist/release-install/*.tgz
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: raad-release-assets
+          path: dist/release
+      - name: Publish tested artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_TAG" --json isDraft > /tmp/raad-release.json; then
+            python -c 'import json; assert json.load(open("/tmp/raad-release.json"))["isDraft"], "Refusing to replace a published release"'
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "🤙 raad $RELEASE_TAG" --notes-file docs/release-notes.md
+          fi
+          gh release upload "$RELEASE_TAG" dist/release/* --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --latest
+  pypi:
+    needs: publish
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: raad-release-assets
+          path: dist/release
+      - run: |
+          mkdir -p dist/wheels
+          cp dist/release/*.whl dist/wheels/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/wheels
+          skip-existing: true
+  npm:
+    needs: publish
+    if: vars.NPM_TRUSTED_PUBLISHING == 'true'
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --global npm@11
+      - uses: actions/download-artifact@v4
+        with:
+          name: raad-release-assets
+          path: dist/release
+      - name: Publish the combined native package
+        run: npm publish dist/release/amanmibra-raad-*.tgz --access public
+  installation:
+    needs: publish
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --prefix sdks/typescript
+      - name: Download and verify public release assets
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python scripts/test_release.py --tag "$RELEASE_TAG" --output dist/release-install
+      - name: Test clean installed SDKs
+        run: python scripts/test_sdk_packages.py --wheel dist/release-install/*.whl --npm-package dist/release-install/*.tgz

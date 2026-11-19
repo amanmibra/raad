@@ -8,13 +8,20 @@ Use raad inside your application without running a separate service. Python and 
 | Node.js or TypeScript backend | `@amanmibra/raad` | [TypeScript guide](typescript/README.md) |
 | Rust | `raad` crate | [Rust example](../examples/local.rs) |
 
-The Python and npm packages are version 0.1.0 source packages in this repository. They haven't been published to package registries. Source builds require Rust 1.94+; a matching prebuilt wheel or npm tarball doesn't.
+Install the SDK for your application:
 
-Rust applications can depend on the same core without CLI/MCP dependencies:
+```sh
+python -m pip install raad
+npm install @amanmibra/raad
+```
+
+Prebuilt packages support Apple Silicon macOS and Linux x86-64. See [installation](../docs/installation.md) for runtime requirements, version-pinned commands, and direct GitHub Release downloads. Rust is only needed to build from source.
+
+Rust applications can depend on the same core without CLI/MCP dependencies. The Rust crate is not published to crates.io:
 
 ```toml
 [dependencies]
-raad = { git = "https://github.com/amanmibra/raad.git", default-features = false }
+raad = { git = "https://github.com/amanmibra/raad.git", tag = "v0.1.0", default-features = false }
 ```
 
 Start with the [application walkthrough](../examples/sdk/README.md). It includes local examples, GitHub App credentials, and PR proposals.

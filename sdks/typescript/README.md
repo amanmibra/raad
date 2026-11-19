@@ -2,18 +2,13 @@
 
 Read Git-backed application data directly from your app. This package embeds the Rust core: it doesn't call the raad CLI or run a server. Requires Node.js 20+ and Git 2.45+. It's a server-side package, not a browser SDK.
 
-## Install from source
-
-From the raad repository root:
+## Install
 
 ```sh
-cd sdks/typescript
-npm ci
-npm run build
-npm pack
+npm install @amanmibra/raad
 ```
 
-Install the resulting tarball in your application with `npm install /path/to/amanmibra-raad-0.1.0.tgz`. Source builds require Rust 1.94+ and Node.js 22.13+ on the Node 22 LTS line (or a newer supported LTS). The tarball contains a native binary for the machine that built it; install it on a matching OS and architecture. This package hasn't been published to npm.
+The package includes native binaries for Apple Silicon macOS and Linux x86-64 (glibc 2.35+). Installation selects the matching binary and needs no Rust compiler. See [installation](https://github.com/amanmibra/raad/blob/v0.1.0/docs/installation.md) for version-pinned commands and a direct GitHub download.
 
 ## Read your config
 
@@ -29,7 +24,7 @@ console.log(file.commitSha);
 
 Choose a local repository or set `repository: 'owner/repo'` for GitHub. `root` selects a folder within it. Call `sync()` before the first read; reads never fetch or validate a newer commit implicitly. All native operations run in worker threads and return promises.
 
-See the [application walkthrough](../../examples/sdk/README.md) for GitHub App credentials and PR proposals.
+See the [application walkthrough](https://github.com/amanmibra/raad/blob/v0.1.0/examples/sdk/README.md) for GitHub App credentials and PR proposals.
 
 ## GitHub and credentials
 
@@ -67,6 +62,19 @@ Catch `RaadError`, or a specific subclass: `CacheMissError`, `InvalidPathError`,
 
 ## Packaging and runtime
 
-`npm pack` builds the native module and emits a tarball containing it, the JavaScript API, and TypeScript declarations. It has no runtime npm dependencies. Use the artifact built for your deployment's OS/architecture; a macOS tarball won't run on Linux. Linux binaries also depend on the build's glibc baseline (Ubuntu 22.04/glibc 2.35 in CI); musl/Alpine isn't supported by these artifacts. Git is the only required external executable. Native addons need a Node server runtime; they don't run in browsers or edge isolates.
+The published package and the combined GitHub Release tarball contain both tested native binaries, the JavaScript API, and TypeScript declarations. They have no runtime npm dependencies. Platform-specific release tarballs contain only one binary; choose the matching OS/architecture if using those. Linux binaries depend on glibc 2.35+; musl/Alpine isn't supported by these artifacts. Git is the only required external executable. Native addons need a Node server runtime; they don't run in browsers or edge isolates.
 
-The cache must persist for offline startup. Native work runs on Node's worker pool. A dropped promise doesn't stop an already-running sync or write. The same [cache privacy and validation boundaries](../README.md) apply as in Rust.
+## Build from source
+
+From the raad repository root, with Rust 1.94+ and Node.js 22.13+ (or a newer supported LTS):
+
+```sh
+cd sdks/typescript
+npm ci
+npm run build
+npm pack
+```
+
+Install the resulting tarball in your application with `npm install /path/to/amanmibra-raad-0.1.0.tgz`. A source-built tarball contains the native binary for the machine that built it. The release workflow combines the tested Linux and macOS builds for distribution.
+
+The cache must persist for offline startup. Native work runs on Node's worker pool. A dropped promise doesn't stop an already-running sync or write. The same [cache privacy and validation boundaries](https://github.com/amanmibra/raad/blob/v0.1.0/sdks/README.md) apply as in Rust.

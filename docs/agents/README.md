@@ -54,4 +54,6 @@ See [human README](../../README.md), [MCP setup](../mcp.md), [security](../secur
 
 ## Embedding in an application
 
+Install Python with `python -m pip install raad` or Node with `npm install @amanmibra/raad`. The published SDKs include native binaries for Apple Silicon macOS and Linux x86-64; they need Git but no Rust compiler. Use [installation](../installation.md) for exact runtime requirements, version-pinned commands, CLI/MCP downloads, and checksums. Do not send application users through the contributor build steps. Unsupported platforms require a source build.
+
 Host applications can use the [Python or TypeScript SDKs](../../sdks/README.md), which embed the Rust core without the raad CLI. Python offers sync/async interfaces; Node methods return promises. Use explicit sync, persistent caches, commit-pinned reads, and host-supplied token callbacks. SDK writes require mount authorization; MCP permission boundaries remain unchanged. See the [application walkthrough](../../examples/sdk/README.md).

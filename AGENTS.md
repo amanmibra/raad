@@ -4,6 +4,10 @@ Use [README.md](README.md), [architecture](docs/architecture.md), and [docs/agen
 
 Keep implementation plans, integration proposals, and roadmaps inline in the conversation. Do not commit planning documents to this public repository. Public documentation should explain shipped behavior, working examples, and known limitations.
 
+## Version policy
+
+Keep early releases at `0.1.x`. Increment the patch component by default (`0.1.1`, `0.1.2`, and so on). Do not bump to `0.2.0` before the project has users; any minor increase needs an explicit decision from the maintainer. Remain on major version `0`. The release version check enforces `v0.1.x` until that policy is explicitly changed. Keep versions aligned across the Rust core, SDKs, and MCP metadata.
+
 ## Product invariants
 
 - Git repositories, not raad, are authoritative for managed data.
@@ -35,4 +39,4 @@ Do not modify the `sop` or `sopops` projects as part of this repository's v0.1 i
 
 ## Native SDKs
 
-Python and Node bindings in `sdks/` must call the Rust core in-process. Keep caching, validation, permissions, and provider behavior in the core. Preserve SDK API parity, explicit sync, typed errors, credential redaction, and nonblocking async interfaces. Follow [SDK checks](sdks/README.md#build-and-verify), including clean wheel/npm consumers. Do not claim registry publication or untested binary targets.
+Python and Node bindings in `sdks/` must call the Rust core in-process. Keep caching, validation, permissions, and provider behavior in the core. Preserve SDK API parity, explicit sync, typed errors, credential redaction, and nonblocking async interfaces. Follow [SDK checks](sdks/README.md#build-and-verify), including clean wheel/npm consumers. Human and agent installation docs must use published packages or tested release downloads first; keep source-build instructions in contributor sections. Verify publication before claiming it and do not claim untested binary targets. See [release instructions](CONTRIBUTING.md#publish-a-release).

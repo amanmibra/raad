@@ -6,10 +6,10 @@ The SDKs embed raad's Rust core. Your app needs Git, but it doesn't need the raa
 
 ## Run the Python example
 
-From the repository root, with Python 3.10+ and Rust 1.94+:
+From the repository root, with Python 3.10+ and Git 2.45+:
 
 ```sh
-python -m pip install ./sdks/python
+python -m pip install raad==0.1.0
 python examples/sdk/python_app.py
 ```
 
@@ -17,16 +17,14 @@ python examples/sdk/python_app.py
 
 ## Run the TypeScript example
 
-From the repository root, with Node.js 22.13+ and Rust 1.94+:
+From the repository root, with Node.js 20+ and Git 2.45+:
 
 ```sh
-npm ci --prefix sdks/typescript
-npm run build --prefix sdks/typescript
-npm ci --prefix examples/sdk
+npm install --prefix examples/sdk @amanmibra/raad@0.1.0
 npm start --prefix examples/sdk
 ```
 
-[typescript_app.ts](typescript_app.ts) does the same thing with promises. Both examples use temporary caches for the demo; use persistent cache storage in production.
+[typescript_app.ts](typescript_app.ts) does the same thing with promises. Both examples use temporary caches for the demo; use persistent cache storage in production. The prebuilt SDKs need no Rust compiler; see [supported platforms and direct downloads](../../docs/installation.md). The checked-in Node example uses a local package dependency for contributor tests; the install command above switches it to the published package.
 
 ## Connect a GitHub folder
 
