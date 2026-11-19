@@ -4,6 +4,8 @@ Use [README.md](README.md), [architecture](docs/architecture.md), and [docs/agen
 
 Keep implementation plans, integration proposals, and roadmaps inline in the conversation. Do not commit planning documents to this public repository. Public documentation should explain shipped behavior, working examples, and known limitations.
 
+Get an explicit instruction before adding a publication destination or reserving a package name; credentials or a registry login alone do not authorize publication. The currently authorized destinations are GitHub Releases, PyPI (`raad`), and npm (`@amanmibra/raad`). Keep direct GitHub downloads available alongside registry installs.
+
 ## Version policy
 
 Keep early releases at `0.1.x`. Increment the patch component by default (`0.1.1`, `0.1.2`, and so on). Do not bump to `0.2.0` before the project has users; any minor increase needs an explicit decision from the maintainer. Remain on major version `0`. The release version check enforces `v0.1.x` until that policy is explicitly changed. Keep versions aligned across the Rust core, SDKs, and MCP metadata.

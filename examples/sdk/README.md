@@ -9,7 +9,7 @@ The SDKs embed raad's Rust core. Your app needs Git, but it doesn't need the raa
 From the repository root, with Python 3.10+ and Git 2.45+:
 
 ```sh
-python -m pip install raad==0.1.0
+python -m pip install raad==0.1.1
 python examples/sdk/python_app.py
 ```
 
@@ -20,7 +20,7 @@ python examples/sdk/python_app.py
 From the repository root, with Node.js 20+ and Git 2.45+:
 
 ```sh
-npm install --prefix examples/sdk @amanmibra/raad@0.1.0
+npm install --prefix examples/sdk @amanmibra/raad@0.1.1
 npm start --prefix examples/sdk
 ```
 

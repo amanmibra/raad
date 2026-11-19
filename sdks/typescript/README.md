@@ -8,7 +8,7 @@ Read Git-backed application data directly from your app. This package embeds the
 npm install @amanmibra/raad
 ```
 
-The package includes native binaries for Apple Silicon macOS and Linux x86-64 (glibc 2.35+). Installation selects the matching binary and needs no Rust compiler. See [installation](https://github.com/amanmibra/raad/blob/v0.1.0/docs/installation.md) for version-pinned commands and a direct GitHub download.
+The package includes native binaries for Apple Silicon macOS and Linux x86-64 (glibc 2.35+). Installation selects the matching binary and needs no Rust compiler. See [installation](https://github.com/amanmibra/raad/blob/v0.1.1/docs/installation.md) for version-pinned commands and a direct GitHub download.
 
 ## Read your config
 
@@ -24,7 +24,7 @@ console.log(file.commitSha);
 
 Choose a local repository or set `repository: 'owner/repo'` for GitHub. `root` selects a folder within it. Call `sync()` before the first read; reads never fetch or validate a newer commit implicitly. All native operations run in worker threads and return promises.
 
-See the [application walkthrough](https://github.com/amanmibra/raad/blob/v0.1.0/examples/sdk/README.md) for GitHub App credentials and PR proposals.
+See the [application walkthrough](https://github.com/amanmibra/raad/blob/v0.1.1/examples/sdk/README.md) for GitHub App credentials and PR proposals.
 
 ## GitHub and credentials
 
@@ -75,6 +75,6 @@ npm run build
 npm pack
 ```
 
-Install the resulting tarball in your application with `npm install /path/to/amanmibra-raad-0.1.0.tgz`. A source-built tarball contains the native binary for the machine that built it. The release workflow combines the tested Linux and macOS builds for distribution.
+Install the resulting tarball in your application with `npm install /path/to/amanmibra-raad-0.1.1.tgz`. A source-built tarball contains the native binary for the machine that built it. The release workflow combines the tested Linux and macOS builds for distribution.
 
-The cache must persist for offline startup. Native work runs on Node's worker pool. A dropped promise doesn't stop an already-running sync or write. The same [cache privacy and validation boundaries](https://github.com/amanmibra/raad/blob/v0.1.0/sdks/README.md) apply as in Rust.
+The cache must persist for offline startup. Native work runs on Node's worker pool. A dropped promise doesn't stop an already-running sync or write. The same [cache privacy and validation boundaries](https://github.com/amanmibra/raad/blob/v0.1.1/sdks/README.md) apply as in Rust.

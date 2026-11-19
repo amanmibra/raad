@@ -3,7 +3,7 @@
   "name": "io.github.amanmibra/raad",
   "description": "Scoped, validated Git-backed application data over local stdio MCP.",
   "repository": {"url": "https://github.com/amanmibra/raad", "source": "github"},
-  "version": "0.1.0",
+  "version": "0.1.1",
   "_meta": {
     "io.modelcontextprotocol.registry/publisher-provided": {
       "status": "Unpublished source-install metadata; configure ownership and published package before registry submission.",

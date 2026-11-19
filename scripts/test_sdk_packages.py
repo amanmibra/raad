@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Install a built wheel and npm tarball in clean apps and verify shared-cache reads."""
+"""Install built artifacts or registry packages in clean apps and verify shared-cache reads."""
 import argparse
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -16,10 +17,20 @@ def run(args, **kwargs):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--wheel", type=Path, required=True)
-    parser.add_argument("--npm-package", type=Path, required=True)
+    parser.add_argument("--wheel", type=Path)
+    parser.add_argument("--npm-package", type=Path)
+    parser.add_argument("--registry-version", help="install this exact version from PyPI and npm")
     args = parser.parse_args()
-    wheel, package = args.wheel.resolve(), args.npm_package.resolve()
+    if args.registry_version:
+        if args.wheel or args.npm_package or not re.fullmatch(r"0\.1\.\d+", args.registry_version):
+            parser.error("use --registry-version 0.1.x without artifact paths")
+        python_install = ["--only-binary=:all:", f"raad=={args.registry_version}"]
+        node_install = f"@amanmibra/raad@{args.registry_version}"
+    else:
+        if not args.wheel or not args.npm_package:
+            parser.error("provide both --wheel and --npm-package, or --registry-version")
+        python_install = ["--no-index", str(args.wheel.resolve())]
+        node_install = str(args.npm_package.resolve())
     with tempfile.TemporaryDirectory(prefix="raad-installed-sdks-") as directory:
         base = Path(directory)
         source = base / "source"
@@ -40,7 +51,7 @@ def main():
         python_env = base / "python-app"
         venv.EnvBuilder(with_pip=True).create(python_env)
         python = python_env / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-        run([str(python), "-m", "pip", "install", "--no-index", str(wheel)])
+        run([str(python), "-m", "pip", "install", *python_install])
         result = json.loads(run([str(python), "-c", '''
 import json, os
 import raad._native
@@ -57,7 +68,7 @@ print(json.dumps({"data":file.json(), "sha":file.commit_sha, "native":raad._nati
         node_app = base / "node-app"
         node_app.mkdir()
         (node_app / "package.json").write_text('{"private":true,"type":"module"}')
-        run(["npm", "install", "--ignore-scripts", "--no-audit", "--no-fund", str(package)], cwd=node_app)
+        run(["npm", "install", "--no-audit", "--no-fund", node_install], cwd=node_app)
         (node_app / "app.ts").write_text('''
 import {Repository, type Change, ConflictError} from '@amanmibra/raad';
 async function check(repo: Repository) {

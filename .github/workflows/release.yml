@@ -195,3 +195,23 @@ jobs:
         run: python scripts/test_release.py --tag "$RELEASE_TAG" --output dist/release-install
       - name: Test clean installed SDKs
         run: python scripts/test_sdk_packages.py --wheel dist/release-install/*.whl --npm-package dist/release-install/*.tgz
+  registry-installation:
+    needs: [pypi, npm]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --prefix sdks/typescript
+      - name: Verify registry installs in clean apps
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python scripts/test_sdk_packages.py --registry-version "${RELEASE_TAG#v}"

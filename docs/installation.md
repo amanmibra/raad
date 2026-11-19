@@ -1,6 +1,6 @@
 # Install raad
 
-The SDKs and CLI are available from [GitHub Releases](https://github.com/amanmibra/raad/releases/tag/v0.1.0). Python and Node packages embed the Rust core; you don't need Rust, a separate raad CLI, or a server to use them.
+The SDKs and CLI are available from [GitHub Releases](https://github.com/amanmibra/raad/releases/tag/v0.1.1). Python and Node packages embed the Rust core; you don't need Rust, a separate raad CLI, or a server to use them.
 
 All packages require **Git 2.45+**. Prebuilt downloads support Apple Silicon macOS 11+ and Linux x86-64. Python wheels require glibc 2.34+ on Linux; Node and CLI binaries require glibc 2.35+. Windows, Intel macOS, Linux arm64, and Alpine/musl need separate builds and aren't supported by these downloads.
 
@@ -9,13 +9,13 @@ All packages require **Git 2.45+**. Prebuilt downloads support Apple Silicon mac
 Requires Python 3.10+:
 
 ```sh
-python -m pip install raad==0.1.0
+python -m pip install raad==0.1.1
 ```
 
 For a project managed by uv:
 
 ```sh
-uv add raad==0.1.0
+uv add raad==0.1.1
 ```
 
 Try it:
@@ -32,10 +32,10 @@ To install directly from GitHub instead of PyPI, choose your platform:
 
 ```sh
 # Apple Silicon macOS
-python -m pip install https://github.com/amanmibra/raad/releases/download/v0.1.0/raad-0.1.0-cp310-abi3-macosx_11_0_arm64.whl
+python -m pip install https://github.com/amanmibra/raad/releases/download/v0.1.1/raad-0.1.1-cp310-abi3-macosx_11_0_arm64.whl
 
 # Linux x86-64, glibc 2.34+
-python -m pip install https://github.com/amanmibra/raad/releases/download/v0.1.0/raad-0.1.0-cp310-abi3-manylinux_2_34_x86_64.whl
+python -m pip install https://github.com/amanmibra/raad/releases/download/v0.1.1/raad-0.1.1-cp310-abi3-manylinux_2_34_x86_64.whl
 ```
 
 ## TypeScript and Node.js
@@ -43,7 +43,7 @@ python -m pip install https://github.com/amanmibra/raad/releases/download/v0.1.0
 Requires Node.js 20+; use a supported Node LTS release:
 
 ```sh
-npm install @amanmibra/raad@0.1.0
+npm install @amanmibra/raad@0.1.1
 ```
 
 The package includes both supported native binaries and selects the matching one. It runs in Node servers, not browsers or edge isolates.
@@ -59,7 +59,7 @@ console.log((await repo.read('agent.schema.json')).json());
 To install directly from GitHub instead of npm:
 
 ```sh
-npm install https://github.com/amanmibra/raad/releases/download/v0.1.0/amanmibra-raad-0.1.0.tgz
+npm install https://github.com/amanmibra/raad/releases/download/v0.1.1/amanmibra-raad-0.1.1.tgz
 ```
 
 ## CLI and local MCP server
@@ -67,7 +67,7 @@ npm install https://github.com/amanmibra/raad/releases/download/v0.1.0/amanmibra
 Download the archive for your platform from the release page. For Apple Silicon macOS:
 
 ```sh
-curl -fL https://github.com/amanmibra/raad/releases/download/v0.1.0/raad-aarch64-apple-darwin.tar.gz -o raad.tar.gz
+curl -fL https://github.com/amanmibra/raad/releases/download/v0.1.1/raad-aarch64-apple-darwin.tar.gz -o raad.tar.gz
 tar -xzf raad.tar.gz ./raad
 mkdir -p "$HOME/.local/bin"
 install -m 755 raad "$HOME/.local/bin/raad"

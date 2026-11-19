@@ -21,7 +21,7 @@ Rust applications can depend on the same core without CLI/MCP dependencies. The 
 
 ```toml
 [dependencies]
-raad = { git = "https://github.com/amanmibra/raad.git", tag = "v0.1.0", default-features = false }
+raad = { git = "https://github.com/amanmibra/raad.git", tag = "v0.1.1", default-features = false }
 ```
 
 Start with the [application walkthrough](../examples/sdk/README.md). It includes local examples, GitHub App credentials, and PR proposals.

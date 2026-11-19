@@ -8,7 +8,7 @@ Read Git-backed application data directly from Python. This package embeds the R
 python -m pip install raad
 ```
 
-Prebuilt wheels need no Rust compiler. They support Apple Silicon macOS and Linux x86-64 with glibc 2.34+. See [installation](https://github.com/amanmibra/raad/blob/v0.1.0/docs/installation.md) for version-pinned commands, uv, and direct GitHub downloads.
+Prebuilt wheels need no Rust compiler. They support Apple Silicon macOS and Linux x86-64 with glibc 2.34+. See [installation](https://github.com/amanmibra/raad/blob/v0.1.1/docs/installation.md) for version-pinned commands, uv, and direct GitHub downloads.
 
 ## Read your config
 
@@ -24,7 +24,7 @@ print(file.commit_sha)
 
 Choose a local repository or set `repository="owner/repo"` for GitHub. `root` selects a folder within it. Call `sync()` before the first read; reads never fetch or validate a newer commit implicitly.
 
-For FastAPI/sopops, use `AsyncRepository`. See the [application walkthrough](https://github.com/amanmibra/raad/blob/v0.1.0/examples/sdk/README.md).
+For FastAPI/sopops, use `AsyncRepository`. See the [application walkthrough](https://github.com/amanmibra/raad/blob/v0.1.1/examples/sdk/README.md).
 
 ## GitHub and credentials
 
@@ -56,7 +56,7 @@ All methods also exist on `AsyncRepository` and are awaited. `Status` has `activ
 
 For writes, pass `Put(path, text_or_bytes, executable=False)` and/or `Delete(path)` objects. PRs require `allow_proposals=True`. They validate the full candidate and reject a stale expected base. They don't activate data or merge the PR. Direct writes require `allow_direct=True` and a `commit()` call; only regular nonexecutable files are supported by the direct adapter.
 
-Options include `branch`, `refresh_seconds`, `validation`, and `limits`. Validation and limits use the same snake_case keys as the [trusted configuration format](https://github.com/amanmibra/raad/blob/v0.1.0/docs/configuration.md). `github_api_url` is a trusted host override for API test servers; it doesn't change Git fetch URLs.
+Options include `branch`, `refresh_seconds`, `validation`, and `limits`. Validation and limits use the same snake_case keys as the [trusted configuration format](https://github.com/amanmibra/raad/blob/v0.1.1/docs/configuration.md). `github_api_url` is a trusted host override for API test servers; it doesn't change Git fetch URLs.
 
 Catch `RaadError` for all raad failures, or a specific subclass: `CacheMissError`, `InvalidPathError`, `NotFoundError`, `ValidationError`, `ConflictError`, `PermissionDeniedError`, `RemoteUnavailableError`, `RateLimitError`, `CacheCorruptionError`, `LimitError`, or `ConfigurationError`. Each error has a stable `code`. Binary `text` decoding can raise Python's `UnicodeDecodeError`; JSON decoding can raise `JSONDecodeError`.
 
@@ -77,4 +77,4 @@ python -m maturin build --release --manifest-path sdks/python/Cargo.toml --out d
 
 Run from the repository root. The wheel uses CPython's stable ABI for Python 3.10+. CI installs wheels in clean environments and runs the integration tests. Published wheels and their checksums are also attached to [GitHub Releases](https://github.com/amanmibra/raad/releases/latest).
 
-The cache must persist for offline startup. Native methods release the GIL; async methods use worker threads. Cancelling a wait doesn't stop an already-running native operation. The same [cache privacy and validation boundaries](https://github.com/amanmibra/raad/blob/v0.1.0/sdks/README.md) apply as in Rust.
+The cache must persist for offline startup. Native methods release the GIL; async methods use worker threads. Cancelling a wait doesn't stop an already-running native operation. The same [cache privacy and validation boundaries](https://github.com/amanmibra/raad/blob/v0.1.1/sdks/README.md) apply as in Rust.

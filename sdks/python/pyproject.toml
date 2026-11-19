@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "raad"
-version = "0.1.0"
+version = "0.1.1"
 description = "Native Python SDK for validated Git-backed application data"
 requires-python = ">=3.10"
 readme = "README.md"
