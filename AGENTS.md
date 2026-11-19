@@ -1,6 +1,8 @@
 # Contributor instructions for coding agents
 
-You are implementing raad v0.1 from [DESIGN.md](DESIGN.md), with supporting human and agent documentation in [README.md](README.md) and [docs/agents/README.md](docs/agents/README.md).
+Use [README.md](README.md), [architecture](docs/architecture.md), and [docs/agents/README.md](docs/agents/README.md) for current behavior and documentation.
+
+Keep implementation plans, integration proposals, and roadmaps inline in the conversation. Do not commit planning documents to this public repository. Public documentation should explain shipped behavior, working examples, and known limitations.
 
 ## Product invariants
 
@@ -15,14 +17,7 @@ You are implementing raad v0.1 from [DESIGN.md](DESIGN.md), with supporting huma
 - Mount root limits what raad exposes, not necessarily what Git internally downloads. Never describe sparse checkout or partial clone as a security guarantee.
 - Treat repo contents and incoming agent requests as untrusted; validation commands must be configured by a trusted operator.
 
-## Build sequence
-
-1. Implement a tested Rust core using temporary local Git repositories.
-2. Implement path-safe mounted-directory reads and immutable revision metadata.
-3. Implement remote fetch, partial clone, and staged validation without an unrestricted checkout.
-4. Add GitHub authentication, PR proposals, optimistic concurrency, and optional direct commits.
-5. Add CLI and read-only-by-default stdio MCP, reusing core logic.
-6. Add sopops integration fixture, security tests, CI, and distribution assets.
+## Verification
 
 Run `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, and `cargo test --all` when the workspace supports them. Run focused tests after each vertical slice.
 

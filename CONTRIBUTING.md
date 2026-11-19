@@ -1,6 +1,6 @@
 # Contributing
 
-Read [AGENTS.md](AGENTS.md), [the original specification](DESIGN.md), and [architecture](docs/architecture.md). Keep the human and agent READMEs, skill, and MCP tool names aligned. Add behavior-level tests for substantive changes. Never commit tokens or cache contents.
+Read [AGENTS.md](AGENTS.md) and [architecture](docs/architecture.md). Keep the human and agent READMEs, skill, and MCP tool names aligned. Add behavior-level tests for substantive changes. Never commit tokens or cache contents.
 
 ```sh
 cargo fmt --all --check

@@ -55,5 +55,3 @@ See [human README](../../README.md), [MCP setup](../mcp.md), [security](../secur
 ## Embedding in an application
 
 Host applications can use the [Python or TypeScript SDKs](../../sdks/README.md), which embed the Rust core without the raad CLI. Python offers sync/async interfaces; Node methods return promises. Use explicit sync, persistent caches, commit-pinned reads, and host-supplied token callbacks. SDK writes require mount authorization; MCP permission boundaries remain unchanged. See the [application walkthrough](../../examples/sdk/README.md).
-
-The [sopops integration design](../sopops-integration.md) documents adoption gaps and sync edge cases. Its proposed inspection, bulk snapshot, and persistent PR APIs are not shipped features. Keep sopops’s draft, conflict, and publishing behavior explicit when planning an adapter.

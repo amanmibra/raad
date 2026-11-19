@@ -104,7 +104,6 @@ raad checks JSON and YAML by default. You can add schemas or a validator such as
 - [Configuration](docs/configuration.md) and [agent guide](docs/agents/README.md)
 - [Contributing and tests](CONTRIBUTING.md)
 - [Verification and known limitations](docs/verification.md)
-- [sopops integration design](docs/sopops-integration.md) — SDK gaps, sync edge cases, and rollout
 
 raad fits data that you read often and change through review. Use another store for sessions, event logs, counters, or transactions.
 
