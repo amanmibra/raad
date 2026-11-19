@@ -1,14 +1,20 @@
 import importlib.util
 import io
+import json
 from pathlib import Path
 import tarfile
 import tempfile
 import unittest
+import urllib.error
 from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location("prepare_release", Path(__file__).resolve().parents[1] / "prepare_release.py")
 release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
+
+consumer_spec = importlib.util.spec_from_file_location("test_sdk_packages", Path(__file__).resolve().parents[1] / "test_sdk_packages.py")
+consumer = importlib.util.module_from_spec(consumer_spec)
+consumer_spec.loader.exec_module(consumer)
 
 
 class CombinedPackageTests(unittest.TestCase):
@@ -58,6 +64,30 @@ class CombinedPackageTests(unittest.TestCase):
                 with self.assertRaises(SystemExit) as error:
                     release.main()
                 self.assertEqual(error.exception.code, 2)
+
+
+class RegistryVisibilityTests(unittest.TestCase):
+    def test_waits_for_delayed_npm_version(self):
+        replies = [io.BytesIO(json.dumps({"info": {"version": "0.1.1"}}).encode()),
+                   urllib.error.HTTPError("https://registry.npmjs.org", 404, "processing", {}, None),
+                   io.BytesIO(json.dumps({"versions": {"0.1.1": {"version": "0.1.1"}}}).encode())]
+        with patch.object(consumer.urllib.request, "urlopen", side_effect=replies) as fetch, patch.object(consumer.time, "sleep") as sleep:
+            consumer.wait_for_registries("0.1.1")
+        self.assertEqual(fetch.call_count, 3)
+        sleep.assert_called_once_with(5)
+
+    def test_placeholder_does_not_count_as_published_version(self):
+        replies = [io.BytesIO(json.dumps({"info": {"version": "0.1.1"}}).encode()),
+                   io.BytesIO(json.dumps({"versions": {"0.0.0-stage": {"version": "0.0.0-stage"}}}).encode()),
+                   io.BytesIO(json.dumps({"versions": {"0.1.1": {"version": "0.1.1"}}}).encode())]
+        with patch.object(consumer.urllib.request, "urlopen", side_effect=replies), patch.object(consumer.time, "sleep") as sleep:
+            consumer.wait_for_registries("0.1.1")
+        sleep.assert_called_once()
+
+    def test_network_failure_has_a_deadline(self):
+        with patch.object(consumer.urllib.request, "urlopen", side_effect=urllib.error.URLError("offline")), patch.object(consumer.time, "monotonic", side_effect=[0, 601]):
+            with self.assertRaisesRegex(RuntimeError, "rerun installation verification, not publication"):
+                consumer.wait_for_registries("0.1.1")
 
 
 if __name__ == "__main__":

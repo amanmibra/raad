@@ -8,11 +8,48 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
+import urllib.error
+import urllib.request
 import venv
 
 
 def run(args, **kwargs):
     return subprocess.check_output(args, stderr=subprocess.PIPE, text=True, **kwargs)
+
+
+def wait_for_registries(version, timeout=600):
+    """A successful publish can precede public package availability, especially on npm."""
+    pending = {
+        "PyPI": f"https://pypi.org/pypi/raad/{version}/json",
+        "npm": "https://registry.npmjs.org/@amanmibra%2fraad",
+    }
+    deadline = time.monotonic() + timeout
+    print(f"Waiting for registry version {version}", flush=True)
+    while pending:
+        for registry, url in list(pending.items()):
+            headers = {"User-Agent": "raad-release-verification", "Cache-Control": "no-cache"}
+            if registry == "npm":
+                headers["Accept"] = "application/vnd.npm.install-v1+json"
+            request = urllib.request.Request(url, headers=headers)
+            try:
+                with urllib.request.urlopen(request, timeout=10) as response:
+                    data = json.loads(response.read(1024 * 1024))
+                actual = data.get("info", {}).get("version") if registry == "PyPI" else data.get("versions", {}).get(version, {}).get("version")
+                if actual == version:
+                    del pending[registry]
+                    print(f"PASS {registry}: {version} is publicly available", flush=True)
+            except urllib.error.HTTPError as error:
+                if error.code not in (404, 408, 429) and error.code < 500:
+                    raise RuntimeError(f"{registry} lookup returned HTTP {error.code}") from None
+            except (urllib.error.URLError, TimeoutError):
+                pass
+        if not pending:
+            return
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise RuntimeError(f"{version} is not yet available on {', '.join(pending)}; check registry processing and rerun installation verification, not publication")
+        time.sleep(min(5, remaining))
 
 
 def main():
@@ -26,6 +63,7 @@ def main():
             parser.error("use --registry-version 0.1.x without artifact paths")
         python_install = ["--only-binary=:all:", f"raad=={args.registry_version}"]
         node_install = f"@amanmibra/raad@{args.registry_version}"
+        wait_for_registries(args.registry_version)
     else:
         if not args.wheel or not args.npm_package:
             parser.error("provide both --wheel and --npm-package, or --registry-version")
@@ -68,7 +106,7 @@ print(json.dumps({"data":file.json(), "sha":file.commit_sha, "native":raad._nati
         node_app = base / "node-app"
         node_app.mkdir()
         (node_app / "package.json").write_text('{"private":true,"type":"module"}')
-        run(["npm", "install", "--no-audit", "--no-fund", node_install], cwd=node_app)
+        run(["npm", "install", "--prefer-online", "--no-audit", "--no-fund", node_install], cwd=node_app)
         (node_app / "app.ts").write_text('''
 import {Repository, type Change, ConflictError} from '@amanmibra/raad';
 async function check(repo: Repository) {

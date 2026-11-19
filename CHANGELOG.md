@@ -2,7 +2,7 @@
 
 ## 0.1.1
 
-Verify PyPI and npm installs in clean applications on Linux x86-64 and Apple Silicon macOS after publication. Keep the core, SDK, and MCP versions aligned, and document publication scope and the `0.1.x` release policy. Direct GitHub downloads remain available.
+Verify PyPI and npm installs in clean applications on Linux x86-64 and Apple Silicon macOS after publication, waiting up to ten minutes for asynchronous registry processing. Keep the core, SDK, and MCP versions aligned, and document publication scope and the `0.1.x` release policy. Direct GitHub downloads remain available.
 
 ## 0.1.0
 
