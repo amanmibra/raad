@@ -358,3 +358,25 @@ fn exclusions_apply_before_validation_and_have_separate_cache_identity() {
         Err(Error::NotFound(_))
     ));
 }
+
+#[test]
+fn default_mount_keeps_existing_cache_identity() {
+    use sha2::{Digest, Sha256};
+    let f = Fixture::new();
+    let config = f.mount.config();
+    let legacy = serde_json::to_vec(&(
+        &config.source,
+        &config.branch,
+        &config.path,
+        &config.validation,
+        config.limits.file_bytes,
+        config.limits.mount_bytes,
+        config.limits.max_files,
+    ))
+    .unwrap();
+    let expected = f.cache.path().join(format!("{:x}", Sha256::digest(legacy)));
+    assert_eq!(f.mount.cache_directory(), expected);
+    f.mount.sync(None).unwrap();
+    let reopened = Mount::open(config.clone(), f.cache.path(), Credentials::Anonymous).unwrap();
+    assert_eq!(reopened.snapshot(None).unwrap().files.len(), 2);
+}

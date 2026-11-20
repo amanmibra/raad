@@ -247,16 +247,21 @@ impl Mount {
         if config.limits.retained_revisions == 0 || config.limits.max_files == 0 {
             return Err(Error::Config("limits must be positive".into()));
         }
-        let identity = serde_json::to_vec(&(
+        let base_identity = (
             &config.source,
             &config.branch,
             &config.path,
             &config.validation,
-            &config.excluded_paths,
             config.limits.file_bytes,
             config.limits.mount_bytes,
             config.limits.max_files,
-        ))?;
+        );
+        // Preserve pre-exclusion cache identities, including warm offline recovery.
+        let identity = if config.excluded_paths.is_empty() {
+            serde_json::to_vec(&base_identity)?
+        } else {
+            serde_json::to_vec(&(base_identity, &config.excluded_paths))?
+        };
         let directory = cache.as_ref().join(digest(&identity));
         fs::create_dir_all(directory.join("snapshots"))?;
         #[cfg(unix)]
