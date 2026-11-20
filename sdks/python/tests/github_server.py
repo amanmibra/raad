@@ -64,7 +64,7 @@ class GitHubServer:
         def side(branch):
             return {"ref": branch, "sha": self.git("rev-parse", branch), "repo": {"full_name": self.repository}}
         return {"number": p["number"], "html_url": f"https://github.com/{self.repository}/pull/{p['number']}",
-                "state": p["state"], "merged": p.get("merged", False), "head": side(p["head"]), "base": side(p["base"])}
+                "body": p.get("body", ""), "state": p["state"], "merged": p.get("merged", False), "head": side(p["head"]), "base": side(p["base"])}
 
     def route(self, method, url, body):
         parsed = urlparse(url)

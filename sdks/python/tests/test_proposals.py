@@ -48,6 +48,35 @@ class ProposalTests(unittest.TestCase):
                                      operation_id="operation-3", expected_head=updated.proposal.commit_sha)
         self.assertEqual(git(self.f.repo, "rev-parse", "application/sync"), human)
 
+    def test_retry_after_old_pr_closes_uses_the_new_operation_pr(self):
+        first = self.send()
+        self.server.pulls[0]["state"] = "closed"
+        self.server.fail_pr = 1
+        options = dict(expected_base=self.base, title="Next operation", branch="application/sync",
+                       operation_id="next-operation", expected_head=first.proposal.commit_sha)
+        changes = [Put("settings.json", '{"next":true}')]
+        with self.assertRaises(RemoteUnavailableError):
+            self.repo.upsert_proposal(changes, **options)
+        recovered = self.repo.upsert_proposal(changes, **options)
+        self.assertEqual(recovered.pull_request_number, 2)
+        self.assertEqual(recovered.state, "open")
+        # A later update belongs to PR 2 even when it closes before retry.
+        latest = self.repo.upsert_proposal([Put("settings.json", '{"last":true}')],
+                  **{**options, "operation_id": "last-operation", "expected_head": recovered.proposal.commit_sha})
+        self.server.pulls[1]["state"] = "closed"
+        retried = self.repo.upsert_proposal([Put("settings.json", '{"last":true}')],
+                  **{**options, "operation_id": "last-operation", "expected_head": recovered.proposal.commit_sha})
+        self.assertEqual(retried.pull_request_number, 2)
+        self.assertEqual(retried.state, "closed")
+        self.assertEqual(len(self.server.pulls), 2)
+
+    def test_removed_closed_pr_marker_requires_review(self):
+        self.send()
+        self.server.pulls[0].update(state="closed", body="edited by a person")
+        with self.assertRaises(ConflictError):
+            self.send()
+        self.assertEqual(len(self.server.pulls), 1)
+
     def test_atomic_cas_race_and_noop(self):
         self.server.before_cas = lambda change: self.server.git("update-ref", change["name"], self.base)
         with self.assertRaises(ConflictError):

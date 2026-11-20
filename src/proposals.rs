@@ -84,6 +84,7 @@ impl Mount {
         let request = &input.request;
         if request.mode != WriteMode::Proposal
             || input.operation_id.is_empty()
+            || input.branch.len() > 255
             || input.operation_id.len() > 128
             || !input
                 .operation_id
@@ -151,6 +152,11 @@ impl Mount {
             "Raad-Branch: {}\nRaad-Operation: {}\nRaad-Request: {}",
             input.branch, input.operation_id, fingerprint
         );
+        if request.body.len() + marker.len() + 2 > 65536 {
+            return Err(Error::Config(
+                "proposal body including operation marker exceeds 64KiB".into(),
+            ));
+        }
         let found = api.call_query(
             Method::GET,
             &["repos", owner, repo, "pulls"],
@@ -169,6 +175,7 @@ impl Mount {
             p["head"]["ref"] == input.branch && p["base"]["ref"] == branch && p["state"] == "open"
         });
         let mut recovered = false;
+        let mut recovered_pr = None;
         if let Some(sha) = &existing {
             let commit = api.call(
                 Method::GET,
@@ -228,6 +235,14 @@ impl Mount {
                     .all(|p| std::str::from_utf8(p).is_ok_and(|p| allowed.contains(p)));
                 self.check_cache_size()?;
                 recovered = scoped && actual == prepared.files;
+                if recovered {
+                    recovered_pr = message
+                        .strip_suffix(&marker)
+                        .and_then(|s| s.strip_suffix('\n'))
+                        .and_then(|s| s.rsplit('\n').next())
+                        .and_then(|s| s.strip_prefix("Raad-PR: "))
+                        .and_then(|s| s.parse::<u64>().ok());
+                }
             }
             if input.expected_head.as_deref() != Some(sha) && !recovered {
                 return Err(Error::Conflict(
@@ -258,12 +273,29 @@ impl Mount {
         }
         if recovered
             && let Some(pr) = prs.iter().find(|p| {
-                p["head"]["sha"].as_str() == existing.as_deref()
-                    && p["head"]["ref"] == input.branch
+                p["head"]["ref"] == input.branch
                     && p["base"]["ref"] == branch
+                    && (recovered_pr.is_some_and(|number| p["number"].as_u64() == Some(number))
+                        || p["body"]
+                            .as_str()
+                            .is_some_and(|body| body.ends_with(&marker)))
             })
         {
             return result("unchanged", existing.as_deref(), Some(pr));
+        }
+        if recovered
+            && prs.iter().any(|p| {
+                p["state"] != "open"
+                    && p["head"]["ref"] == input.branch
+                    && p["head"]["sha"].as_str() == existing.as_deref()
+                    && !p["body"]
+                        .as_str()
+                        .is_some_and(|body| body.contains("\nRaad-Operation: "))
+            })
+        {
+            return Err(Error::Conflict(
+                "closed PR operation identity is missing; review before retrying".into(),
+            ));
         }
         if current != request.expected_base {
             return Err(Error::Conflict(current));
@@ -298,7 +330,11 @@ impl Mount {
                 &["repos", owner, repo, "git", "trees"],
                 Some(json!({"base_tree":field(&base["tree"],"sha")?,"tree":prepared.entries})),
             )?;
-            let commit=api.call(Method::POST,&["repos",owner,repo,"git","commits"],Some(json!({"message":format!("{}\n\n{}\n\n{}",request.title,request.body,marker),"tree":field(&tree,"sha")?,"parents":[request.expected_base]})))?;
+            let association = existing_pr
+                .and_then(|p| p["number"].as_u64())
+                .map(|number| format!("Raad-PR: {number}\n"))
+                .unwrap_or_default();
+            let commit=api.call(Method::POST,&["repos",owner,repo,"git","commits"],Some(json!({"message":format!("{}\n\n{}\n\n{}{}",request.title,request.body,association,marker),"tree":field(&tree,"sha")?,"parents":[request.expected_base]})))?;
             let sha = field(&commit, "sha")?;
             if !valid_sha(&sha) {
                 return Err(Error::Remote("invalid commit SHA".into()));
@@ -323,7 +359,7 @@ impl Mount {
         if let Some(pr) = existing_pr {
             return result("updated", Some(&commit_sha), Some(pr));
         }
-        let pr=api.call(Method::POST,&["repos",owner,repo,"pulls"],Some(json!({"head":input.branch,"base":branch,"title":request.title,"body":request.body})))?;
+        let pr=api.call(Method::POST,&["repos",owner,repo,"pulls"],Some(json!({"head":input.branch,"base":branch,"title":request.title,"body":format!("{}\n\n{}",request.body,marker)})))?;
         result("created", Some(&commit_sha), Some(&pr))
     }
 }
