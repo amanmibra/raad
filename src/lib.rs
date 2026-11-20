@@ -23,6 +23,9 @@ pub use validation::{CommandValidator, SchemaRule, Validation};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// A write rejected before publishing any ref; the inner error retains its type.
+    #[error("{0}")]
+    Rejected(Box<Error>),
     #[error("unsupported capability: {0}")]
     Unsupported(String),
     #[error("invalid path: {0}")]

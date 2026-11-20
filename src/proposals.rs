@@ -119,7 +119,9 @@ impl Mount {
             ));
         }
         let original = self.base_files(&request.expected_base)?;
-        let mut prepared = self.prepare_changes(request, original.clone())?;
+        let mut prepared = self
+            .prepare_changes(request, original.clone())
+            .map_err(|error| Error::Rejected(Box::new(error)))?;
         self.check_cache_size()?;
         let token = self
             .credentials
@@ -298,7 +300,7 @@ impl Mount {
             ));
         }
         if current != request.expected_base && !recovered {
-            return Err(Error::StaleBase(current));
+            return Err(Error::Rejected(Box::new(Error::StaleBase(current))));
         }
         let commit_sha = if recovered {
             existing.clone().unwrap()
@@ -345,7 +347,9 @@ impl Mount {
                 None,
             )?;
             if field(&check["object"], "sha")? != request.expected_base {
-                return Err(Error::StaleBase("base branch moved".into()));
+                return Err(Error::Rejected(Box::new(Error::StaleBase(
+                    "base branch moved".into(),
+                ))));
             }
             let metadata = api.call(Method::GET, &["repos", owner, repo], None)?;
             let updated=api.call(Method::POST,&["graphql"],Some(json!({"query":"mutation($input:UpdateRefsInput!){updateRefs(input:$input){clientMutationId}}","variables":{"input":{"repositoryId":field(&metadata,"node_id")?,"refUpdates":[{"name":format!("refs/heads/{}",input.branch),"beforeOid":existing.clone().unwrap_or_else(||"0".repeat(40)),"afterOid":sha,"force":true}]}}})))?;

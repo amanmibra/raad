@@ -6,7 +6,7 @@ interface Binding { open(options: string): Promise<NativeRepository> }
 const binding = createRequire(import.meta.url)("../binding.cjs") as Binding;
 
 export class RaadError extends Error {
-  constructor(message: string, public readonly code: string = "unknown") {
+  constructor(message: string, public readonly code: string = "unknown", public readonly writeRejected = false) {
     super(message);
     this.name = new.target.name;
   }
@@ -37,7 +37,7 @@ function nativeError(error: unknown, token?: string): RaadError {
     if (typeof value !== "object" || value === null || !("code" in value) || !("message" in value)
         || typeof value.code !== "string" || typeof value.message !== "string") throw new Error();
     const message = token ? value.message.split(token).join("[redacted]") : value.message;
-    return new (errors[value.code] ?? RaadError)(message, value.code);
+    return new (errors[value.code] ?? RaadError)(message, value.code, "write_rejected" in value && value.write_rejected === true);
   } catch {
     return new RaadError("native raad operation failed");
   }

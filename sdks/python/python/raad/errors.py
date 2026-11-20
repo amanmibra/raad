@@ -3,6 +3,7 @@ import json
 
 
 class RaadError(Exception):
+    write_rejected = False
     code = "unknown"
 
     def __init__(self, message: str, *, code: str | None = None):
@@ -80,4 +81,6 @@ def native_error(error: RuntimeError, token: str | None = None) -> RaadError:
         return RaadError("native raad operation failed")
     if token:
         message = message.replace(token, "[redacted]")
-    return _ERRORS.get(code, RaadError)(message, code=code)
+    result = _ERRORS.get(code, RaadError)(message, code=code)
+    result.write_rejected = value.get("write_rejected") is True
+    return result

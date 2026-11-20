@@ -80,8 +80,9 @@ class ProposalTests(unittest.TestCase):
     def test_stale_base_rejection_and_recovery_after_source_advances(self):
         (self.f.repo / "outside.txt").write_text("advanced source")
         self.f.commit()
-        with self.assertRaises(StaleBaseError):
+        with self.assertRaises(StaleBaseError) as rejected:
             self.send()
+        self.assertTrue(rejected.exception.write_rejected)
         self.assertFalse(any(method == "POST" for method, _, _ in self.server.requests))
         # A published ref can finish PR creation after the source advances.
         self.base = self.repo.sync(pin=True).active_sha
@@ -93,6 +94,17 @@ class ProposalTests(unittest.TestCase):
         recovered = self.send()
         self.assertEqual(recovered.state, "open")
         self.assertEqual(recovered.outcome, "created")
+
+    def test_validation_rejection_is_distinct_from_unknown_write_outcome(self):
+        with self.assertRaises(ValidationError) as rejected:
+            self.repo.upsert_proposal([Put("settings.json", 'invalid')], expected_base=self.base,
+                  title="Invalid", branch="application/sync", operation_id="invalid")
+        self.assertTrue(rejected.exception.write_rejected)
+        self.assertFalse(any(method == "POST" for method, _, _ in self.server.requests))
+        self.server.fail_pr = 1
+        with self.assertRaises(RemoteUnavailableError) as unknown:
+            self.send()
+        self.assertFalse(unknown.exception.write_rejected)
 
     def test_atomic_cas_race_and_noop(self):
         self.server.before_cas = lambda change: self.server.git("update-ref", change["name"], self.base)

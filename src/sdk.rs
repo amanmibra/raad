@@ -222,7 +222,14 @@ impl Repository {
 }
 /// Stable machine-readable error codes; bindings never infer types from display strings.
 pub fn error_json(error: Error) -> String {
+    if let Error::Rejected(inner) = error {
+        let mut value: Value =
+            serde_json::from_str(&error_json(*inner)).expect("serialized core error");
+        value["write_rejected"] = json!(true);
+        return value.to_string();
+    }
     let code = match &error {
+        Error::Rejected(_) => unreachable!("handled above"),
         Error::Unsupported(_) => "unsupported_feature",
         Error::InvalidPath(_) => "invalid_path",
         Error::NotFound(_) => "not_found",
