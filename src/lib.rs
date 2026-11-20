@@ -37,6 +37,8 @@ pub enum Error {
     Validation(String),
     #[error("permission denied: {0}")]
     Permission(String),
+    #[error("source branch moved before publication: {0}")]
+    StaleBase(String),
     #[error("stale expected SHA; current branch head is {0}")]
     Conflict(String),
     #[error("remote unavailable: {0}")]

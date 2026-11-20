@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from raad import CacheMissError, ConflictError, InvalidPathError, Put, RemoteUnavailableError, ValidationError
+from raad import CacheMissError, ConflictError, InvalidPathError, Put, RemoteUnavailableError, StaleBaseError, ValidationError
 from test_sdk import Fixture, git
 from github_server import GitHubServer
 
@@ -76,6 +76,23 @@ class ProposalTests(unittest.TestCase):
         with self.assertRaises(ConflictError):
             self.send()
         self.assertEqual(len(self.server.pulls), 1)
+
+    def test_stale_base_rejection_and_recovery_after_source_advances(self):
+        (self.f.repo / "outside.txt").write_text("advanced source")
+        self.f.commit()
+        with self.assertRaises(StaleBaseError):
+            self.send()
+        self.assertFalse(any(method == "POST" for method, _, _ in self.server.requests))
+        # A published ref can finish PR creation after the source advances.
+        self.base = self.repo.sync(pin=True).active_sha
+        self.server.fail_pr = 1
+        with self.assertRaises(RemoteUnavailableError):
+            self.send()
+        (self.f.repo / "outside.txt").write_text("advanced again")
+        self.f.commit()
+        recovered = self.send()
+        self.assertEqual(recovered.state, "open")
+        self.assertEqual(recovered.outcome, "created")
 
     def test_atomic_cas_race_and_noop(self):
         self.server.before_cas = lambda change: self.server.git("update-ref", change["name"], self.base)

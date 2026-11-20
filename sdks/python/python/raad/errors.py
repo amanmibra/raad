@@ -43,6 +43,10 @@ class ConflictError(RaadError):
     code = "conflict"
 
 
+class StaleBaseError(ConflictError):
+    code = "stale_base"
+
+
 class RemoteUnavailableError(RaadError):
     code = "remote_unavailable"
 
@@ -62,7 +66,7 @@ class ConfigurationError(RaadError):
 _ERRORS = {cls.code: cls for cls in (
     UnsupportedFeatureError, InvalidPathError, NotFoundError, CacheMissError, CacheCorruptionError,
     ValidationError, PermissionDeniedError, ConflictError, RemoteUnavailableError,
-    RateLimitError, LimitError, ConfigurationError,
+    StaleBaseError, RateLimitError, LimitError, ConfigurationError,
 )}
 
 

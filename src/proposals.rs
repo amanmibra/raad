@@ -297,8 +297,8 @@ impl Mount {
                 "closed PR operation identity is missing; review before retrying".into(),
             ));
         }
-        if current != request.expected_base {
-            return Err(Error::Conflict(current));
+        if current != request.expected_base && !recovered {
+            return Err(Error::StaleBase(current));
         }
         let commit_sha = if recovered {
             existing.clone().unwrap()
@@ -345,7 +345,7 @@ impl Mount {
                 None,
             )?;
             if field(&check["object"], "sha")? != request.expected_base {
-                return Err(Error::Conflict("base branch moved".into()));
+                return Err(Error::StaleBase("base branch moved".into()));
             }
             let metadata = api.call(Method::GET, &["repos", owner, repo], None)?;
             let updated=api.call(Method::POST,&["graphql"],Some(json!({"query":"mutation($input:UpdateRefsInput!){updateRefs(input:$input){clientMutationId}}","variables":{"input":{"repositoryId":field(&metadata,"node_id")?,"refUpdates":[{"name":format!("refs/heads/{}",input.branch),"beforeOid":existing.clone().unwrap_or_else(||"0".repeat(40)),"afterOid":sha,"force":true}]}}})))?;

@@ -19,6 +19,7 @@ export class ValidationError extends RaadError {}
 export class UnsupportedFeatureError extends ValidationError {}
 export class PermissionDeniedError extends RaadError {}
 export class ConflictError extends RaadError {}
+export class StaleBaseError extends ConflictError {}
 export class RemoteUnavailableError extends RaadError {}
 export class RateLimitError extends RaadError {}
 export class LimitError extends RaadError {}
@@ -27,7 +28,7 @@ const errors: Record<string, typeof RaadError> = {
   unsupported_feature: UnsupportedFeatureError, invalid_path: InvalidPathError, not_found: NotFoundError, cache_miss: CacheMissError,
   cache_corruption: CacheCorruptionError, validation: ValidationError,
   permission_denied: PermissionDeniedError, conflict: ConflictError,
-  remote_unavailable: RemoteUnavailableError, rate_limit: RateLimitError,
+  stale_base: StaleBaseError, remote_unavailable: RemoteUnavailableError, rate_limit: RateLimitError,
   limit: LimitError, configuration: ConfigurationError,
 };
 function nativeError(error: unknown, token?: string): RaadError {

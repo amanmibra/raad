@@ -230,6 +230,7 @@ pub fn error_json(error: Error) -> String {
         Error::Corrupt(_) => "cache_corruption",
         Error::Validation(_) => "validation",
         Error::Permission(_) => "permission_denied",
+        Error::StaleBase(_) => "stale_base",
         Error::Conflict(_) => "conflict",
         Error::Remote(_) => "remote_unavailable",
         Error::RateLimit(_) => "rate_limit",

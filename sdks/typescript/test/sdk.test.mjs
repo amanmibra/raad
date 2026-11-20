@@ -213,3 +213,14 @@ test('proposal upsert uses expected-head CAS and returns typed PR identity', asy
   assert.equal(cas.beforeOid, '0'.repeat(40)); assert.equal(cas.afterOid, commit);
   assert.equal((await repo.proposalStatus(7)).headSha, commit);
 });
+
+test('a source move before proposal publication is a retryable stale-base conflict', async t => {
+  const f = fixture(t), base = git(f.repo, 'rev-parse', 'HEAD');
+  const api = await mock(t, [[200, {object: {sha: 'b'.repeat(40)}}], [404, {}], [200, []]]);
+  const repo = await f.remote({allowProposals: true, githubApiUrl: api.url, tokenProvider: () => 'test-secret'});
+  await repo.sync();
+  await assert.rejects(repo.upsertProposal([{operation: 'put', path: 'policy.md', content: 'New policy'}],
+    {expectedBase: base, title: 'Update', branch: 'app/sync', operationId: 'rejected'}),
+    error => error instanceof ConflictError && error.code === 'stale_base');
+  assert.ok(api.requests.every(r => r.method === 'GET'));
+});
