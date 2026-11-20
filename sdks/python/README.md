@@ -78,3 +78,19 @@ python -m maturin build --release --manifest-path sdks/python/Cargo.toml --out d
 Run from the repository root. The wheel uses CPython's stable ABI for Python 3.10+. CI installs wheels in clean environments and runs the integration tests. Published wheels and their checksums are also attached to [GitHub Releases](https://github.com/amanmibra/raad/releases/latest).
 
 The cache must persist for offline startup. Native methods release the GIL; async methods use worker threads. Cancelling a wait doesn't stop an already-running native operation. The same [cache privacy and validation boundaries](https://github.com/amanmibra/raad/blob/v0.1.1/sdks/README.md) apply as in Rust.
+
+## Sync integrations in the 0.1.2 source API
+
+The source build adds `snapshot(revision=None)`, `inspect_candidate(revision=None)`, `sync(revision=None, pin=True)`, `excluded_paths`, `upsert_proposal(...)` and `proposal_status(number)`. These also exist on `AsyncRepository`. Published 0.1.1 packages don't include these additions. See the [shared API and recovery rules](../../sdks/README.md#sync-integrations-012-source-api).
+
+```python
+# repo is a Repository with allow_proposals=True; changes contains Put/Delete objects.
+source = repo.inspect_candidate()
+result = repo.upsert_proposal(
+    changes, expected_base=source.commit_sha, title="Update instructions",
+    branch="my-app/sync", operation_id=saved_operation_id,
+    expected_head=saved_proposal_head,
+)
+```
+
+Persist `saved_operation_id`, the exact request, and the previous machine head before sending. Retry the same operation after an uncertain result. Save `result.proposal.commit_sha` for the next update. A snapshot's `files` maps paths to bytes; `executables` records executable paths. A candidate also has `root_exists`, `branch` and `issues`, and never activates raw files.

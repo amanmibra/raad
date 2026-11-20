@@ -78,3 +78,19 @@ npm pack
 Install the resulting tarball in your application with `npm install /path/to/amanmibra-raad-0.1.1.tgz`. A source-built tarball contains the native binary for the machine that built it. The release workflow combines the tested Linux and macOS builds for distribution.
 
 The cache must persist for offline startup. Native work runs on Node's worker pool. A dropped promise doesn't stop an already-running sync or write. The same [cache privacy and validation boundaries](https://github.com/amanmibra/raad/blob/v0.1.1/sdks/README.md) apply as in Rust.
+
+## Sync integrations in the 0.1.2 source API
+
+The source build adds `snapshot(revision?)`, `inspectCandidate(revision?)`, `sync(revision, {pin: true})`, `excludedPaths`, `upsertProposal(...)` and `proposalStatus(number)`. Published 0.1.1 packages don't include these additions. See the [shared API and recovery rules](../../sdks/README.md#sync-integrations-012-source-api).
+
+```typescript
+// repo has allowProposals: true; changes contains put/delete objects.
+const source = await repo.inspectCandidate();
+const result = await repo.upsertProposal(changes, {
+  expectedBase: source.commitSha, title: 'Update instructions',
+  branch: 'my-app/sync', operationId: savedOperationId,
+  expectedHead: savedProposalHead,
+});
+```
+
+Persist the operation ID, exact request and previous machine head before sending. Retry the same operation after an uncertain result. Save `result.proposal.commitSha` for the next update when a proposal is returned. Snapshot `files` maps paths to `Uint8Array`; `executables` records executable paths. Candidates also have `rootExists`, `branch` and `issues`, and never activate raw files.

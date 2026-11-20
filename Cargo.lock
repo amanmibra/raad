@@ -1456,7 +1456,7 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "raad"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "base64 0.22.1",
  "clap",
@@ -1477,7 +1477,7 @@ dependencies = [
 
 [[package]]
 name = "raad-node"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "napi",
  "napi-build",
@@ -1487,7 +1487,7 @@ dependencies = [
 
 [[package]]
 name = "raad-python"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "pyo3",
  "raad",

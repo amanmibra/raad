@@ -1,6 +1,6 @@
 {
   "name": "@amanmibra/raad",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Native Node.js and TypeScript SDK for validated Git-backed application data",
   "license": "Apache-2.0",
   "type": "module",

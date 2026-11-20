@@ -106,3 +106,51 @@ def _write_request(changes: Sequence[Put | Delete], expected_base: str,
             raise TypeError("changes must contain Put or Delete objects")
     return {"expected_base": expected_base, "title": title, "body": body,
             "mode": mode, "changes": result}
+
+
+@dataclass(frozen=True)
+class Snapshot:
+    commit_sha: str
+    files: dict[str, bytes]
+    executables: frozenset[str]
+
+    @classmethod
+    def _from_native(cls, value: dict[str, Any]) -> Snapshot:
+        return cls(value["commit_sha"], {p: base64.b64decode(f["content"], validate=True) for p, f in value["files"].items()},
+                   frozenset(p for p, f in value["files"].items() if f["executable"]))
+
+
+@dataclass(frozen=True)
+class Candidate(Snapshot):
+    branch: str
+    root_exists: bool
+    issues: tuple[str, ...]
+
+    @classmethod
+    def _from_native(cls, value: dict[str, Any]) -> Candidate:
+        snapshot = Snapshot._from_native(value)
+        return cls(snapshot.commit_sha, snapshot.files, snapshot.executables, value["branch"], value["root_exists"], tuple(value["issues"]))
+
+
+@dataclass(frozen=True)
+class ProposalStatus:
+    number: int
+    url: str
+    state: str
+    head_sha: str
+    base_sha: str
+    head_branch: str
+    base_branch: str
+
+
+@dataclass(frozen=True)
+class ProposalOutcome:
+    outcome: str
+    proposal: Proposal | None
+    pull_request_number: int | None
+    state: str | None
+
+    @classmethod
+    def _from_native(cls, value: dict[str, Any]) -> ProposalOutcome:
+        return cls(value["outcome"], Proposal(**value["proposal"]) if value["proposal"] else None,
+                   value["pull_request_number"], value["state"])

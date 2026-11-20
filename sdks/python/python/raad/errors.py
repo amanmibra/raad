@@ -31,6 +31,10 @@ class ValidationError(RaadError):
     code = "validation"
 
 
+class UnsupportedFeatureError(ValidationError):
+    code = "unsupported_feature"
+
+
 class PermissionDeniedError(RaadError):
     code = "permission_denied"
 
@@ -56,7 +60,7 @@ class ConfigurationError(RaadError):
 
 
 _ERRORS = {cls.code: cls for cls in (
-    InvalidPathError, NotFoundError, CacheMissError, CacheCorruptionError,
+    UnsupportedFeatureError, InvalidPathError, NotFoundError, CacheMissError, CacheCorruptionError,
     ValidationError, PermissionDeniedError, ConflictError, RemoteUnavailableError,
     RateLimitError, LimitError, ConfigurationError,
 )}

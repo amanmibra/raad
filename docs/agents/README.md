@@ -57,3 +57,9 @@ See [human README](../../README.md), [MCP setup](../mcp.md), [security](../secur
 Install Python with `python -m pip install raad` or Node with `npm install @amanmibra/raad`. The published SDKs include native binaries for Apple Silicon macOS and Linux x86-64; they need Git but no Rust compiler. Use [installation](../installation.md) for exact runtime requirements, version-pinned commands, CLI/MCP downloads, and checksums. Do not send application users through the contributor build steps. Unsupported platforms require a source build.
 
 Host applications can use the [Python or TypeScript SDKs](../../sdks/README.md), which embed the Rust core without the raad CLI. Python offers sync/async interfaces; Node methods return promises. Use explicit sync, persistent caches, commit-pinned reads, and host-supplied token callbacks. SDK writes require mount authorization; MCP permission boundaries remain unchanged. See the [application walkthrough](../../examples/sdk/README.md).
+
+### Host sync APIs in the 0.1.2 source build
+
+The native SDKs add raw candidate inspection, bounded bulk validated snapshots, atomic sync-and-pin, excluded path prefixes, recoverable stable proposal branches and repository-scoped PR status. These aren't additional MCP tools. Published 0.1.1 packages don't have these APIs; use the matching source build when developing against them. Follow the [SDK contracts](../../sdks/README.md#sync-integrations-012-source-api).
+
+Raw inspection must never be presented as validated active data. Validate a complete repair before proposing it. Persist the exact upsert request and operation ID before any write, retry unchanged after uncertain outcomes, and retain the returned machine head for the next expected-head check. Never adopt a human-edited branch or fall back to another writer after auth, validation, network, limit or conflict errors. SDK exclusions apply before blob downloads and prohibit writes; they don't change Git's privacy boundary.

@@ -5,6 +5,7 @@ mod github;
 #[cfg(feature = "mcp")]
 pub mod mcp;
 mod process;
+mod proposals;
 #[doc(hidden)]
 pub mod sdk;
 mod store;
@@ -12,14 +13,18 @@ mod validation;
 
 pub use auth::{Credentials, TokenProvider};
 pub use github::{Change, Proposal, WriteMode, WriteRequest};
+pub use proposals::{ProposalOutcome, ProposalStatus, UpsertRequest};
 use std::path::{Component, Path};
 pub use store::{
-    FileData, HistoryEntry, Limits, Mount, MountConfig, Provenance, ReadResult, Source, Status,
+    Candidate, FileData, HistoryEntry, Limits, Mount, MountConfig, Provenance, ReadResult,
+    Snapshot, Source, Status,
 };
 pub use validation::{CommandValidator, SchemaRule, Validation};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("unsupported capability: {0}")]
+    Unsupported(String),
     #[error("invalid path: {0}")]
     InvalidPath(String),
     #[error("not found: {0}")]

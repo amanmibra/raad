@@ -16,6 +16,7 @@ export class NotFoundError extends RaadError {}
 export class CacheMissError extends RaadError {}
 export class CacheCorruptionError extends RaadError {}
 export class ValidationError extends RaadError {}
+export class UnsupportedFeatureError extends ValidationError {}
 export class PermissionDeniedError extends RaadError {}
 export class ConflictError extends RaadError {}
 export class RemoteUnavailableError extends RaadError {}
@@ -23,7 +24,7 @@ export class RateLimitError extends RaadError {}
 export class LimitError extends RaadError {}
 export class ConfigurationError extends RaadError {}
 const errors: Record<string, typeof RaadError> = {
-  invalid_path: InvalidPathError, not_found: NotFoundError, cache_miss: CacheMissError,
+  unsupported_feature: UnsupportedFeatureError, invalid_path: InvalidPathError, not_found: NotFoundError, cache_miss: CacheMissError,
   cache_corruption: CacheCorruptionError, validation: ValidationError,
   permission_denied: PermissionDeniedError, conflict: ConflictError,
   remote_unavailable: RemoteUnavailableError, rate_limit: RateLimitError,
@@ -54,6 +55,7 @@ export interface Limits {
 }
 export type TokenProvider = () => string | Promise<string>;
 export interface RepositoryOptions {
+  excludedPaths?: string[];
   repository?: string;
   localPath?: string;
   root?: string;
@@ -85,6 +87,15 @@ export interface Proposal {
 }
 export type Change = {operation: "put"; path: string; content: string | Uint8Array; executable?: boolean}
   | {operation: "delete"; path: string};
+export interface Snapshot { commitSha: string; files: Record<string, Uint8Array>; executables: string[] }
+export interface Candidate extends Snapshot { branch: string; rootExists: boolean; issues: string[] }
+export interface ProposalStatus { number: number; url: string; state: "open" | "closed" | "merged"; headSha: string; baseSha: string; headBranch: string; baseBranch: string }
+export interface ProposalOutcome { outcome: "created" | "updated" | "unchanged"; proposal: Proposal | null; pullRequestNumber: number | null; state: string | null }
+interface NativeSnapshot { commit_sha: string; files: Record<string, {content: string; executable: boolean}> }
+function snapshot(value: NativeSnapshot): Snapshot {
+  return {commitSha: value.commit_sha, files: Object.fromEntries(Object.entries(value.files).map(([p,f]) => [p, Buffer.from(f.content, "base64")])),
+    executables: Object.entries(value.files).filter(([,f]) => f.executable).map(([p]) => p)};
+}
 export interface WriteOptions { expectedBase: string; title: string; body?: string }
 
 interface NativeStatus {
@@ -147,7 +158,7 @@ export class Repository {
     );
     try {
       const native = await binding.open(JSON.stringify({
-        repository: options.repository, local_path: options.localPath, root: options.root,
+        excluded_paths: options.excludedPaths, repository: options.repository, local_path: options.localPath, root: options.root,
         branch: options.branch, cache_dir: options.cacheDir, refresh_seconds: options.refreshSeconds,
         validation, limits, allow_proposals: options.allowProposals, allow_direct: options.allowDirect,
         anonymous: options.anonymous, github_api_url: options.githubApiUrl,
@@ -158,7 +169,7 @@ export class Repository {
 
   private async call<T>(request: Record<string, unknown>): Promise<T> {
     let token: string | undefined;
-    if (this.remote && (request.method === "sync" || request.method === "propose") && this.tokenProvider) {
+    if (this.remote && ["sync", "propose", "inspect_candidate", "upsert_proposal", "proposal_status"].includes(String(request.method)) && this.tokenProvider) {
       try {
         token = await this.tokenProvider();
         if (typeof token !== "string" || !token || /[\r\n\0]/.test(token)) throw new Error();
@@ -172,8 +183,24 @@ export class Repository {
     catch (error) { throw nativeError(error, token); }
   }
 
-  async sync(revision?: string): Promise<Status> {
-    return status(await this.call<NativeStatus>({method: "sync", revision}));
+  async sync(revision?: string, options: {pin?: boolean} = {}): Promise<Status> {
+    return status(await this.call<NativeStatus>({method: "sync", revision, pin: options.pin ?? false}));
+  }
+  async snapshot(revision?: string): Promise<Snapshot> {
+    return snapshot(await this.call<NativeSnapshot>({method: "snapshot", revision}));
+  }
+  async inspectCandidate(revision?: string): Promise<Candidate> {
+    const value = await this.call<NativeSnapshot & {branch: string; root_exists: boolean; issues: string[]}>({method: "inspect_candidate", revision});
+    return {...snapshot(value), branch: value.branch, rootExists: value.root_exists, issues: value.issues};
+  }
+  async proposalStatus(number: number): Promise<ProposalStatus> {
+    const p = await this.call<{number: number; url: string; state: ProposalStatus["state"]; head_sha: string; base_sha: string; head_branch: string; base_branch: string}>({method: "proposal_status", number});
+    return {number: p.number, url: p.url, state: p.state, headSha: p.head_sha, baseSha: p.base_sha, headBranch: p.head_branch, baseBranch: p.base_branch};
+  }
+  async upsertProposal(changes: Change[], options: WriteOptions & {branch: string; operationId: string; expectedHead?: string}): Promise<ProposalOutcome> {
+    const request = {expected_base: options.expectedBase, title: options.title, body: options.body ?? "", mode: "proposal", changes: changeEntries(changes)};
+    const v = await this.call<{outcome: ProposalOutcome["outcome"]; proposal: NativeProposal | null; pull_request_number: number | null; state: string | null}>({method: "upsert_proposal", request: {request, branch: options.branch, operation_id: options.operationId, expected_head: options.expectedHead ?? null}});
+    return {outcome: v.outcome, proposal: v.proposal ? proposal(v.proposal) : null, pullRequestNumber: v.pull_request_number, state: v.state};
   }
   async read(path: string, revision?: string): Promise<ReadResult> {
     return new ReadResult(await this.call<NativeRead>({method: "read", path, revision}));
@@ -194,15 +221,7 @@ export class Repository {
   /** Direct write; requires allowDirect: true when opening the repository. */
   commit(changes: Change[], options: WriteOptions): Promise<Proposal> { return this.write(changes, options, "direct"); }
   private async write(changes: Change[], options: WriteOptions, mode: "proposal" | "direct"): Promise<Proposal> {
-    const entries = changes.map(change => {
-      if (change.operation === "delete") return {operation: "delete", path: change.path};
-      if (change.operation !== "put" || !(typeof change.content === "string" || change.content instanceof Uint8Array)) {
-        throw new TypeError("changes must be put/delete objects; put content must be string or Uint8Array");
-      }
-      return {operation: "put", path: change.path, data: {
-        content: Buffer.from(change.content).toString("base64"), executable: change.executable ?? false,
-      }};
-    });
+    const entries = changeEntries(changes);
     return proposal(await this.call<NativeProposal>({method: "propose", request: {
       expected_base: options.expectedBase, title: options.title, body: options.body ?? "", mode, changes: entries,
     }}));
@@ -211,4 +230,16 @@ export class Repository {
   async unpin(sha: string): Promise<void> { await this.call({method: "pin", sha, pinned: false}); }
   async prune(): Promise<Status> { return status(await this.call<NativeStatus>({method: "prune"})); }
   async clearCache(): Promise<void> { await this.call({method: "clear_cache"}); }
+}
+
+function changeEntries(changes: Change[]) {
+  return changes.map(change => {
+      if (change.operation === "delete") return {operation: "delete", path: change.path};
+      if (change.operation !== "put" || !(typeof change.content === "string" || change.content instanceof Uint8Array)) {
+        throw new TypeError("changes must be put/delete objects; put content must be string or Uint8Array");
+      }
+      return {operation: "put", path: change.path, data: {
+        content: Buffer.from(change.content).toString("base64"), executable: change.executable ?? false,
+      }};
+    });
 }

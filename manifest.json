@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.3",
   "name": "raad",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Read validated Git data mounts and propose reviewed changes over local stdio MCP.",
   "author": {"name": "raad contributors"},
   "license": "Apache-2.0",

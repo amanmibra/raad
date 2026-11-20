@@ -8,6 +8,7 @@ use std::{path::PathBuf, sync::Arc};
 #[derive(Deserialize)]
 #[serde(default, deny_unknown_fields)]
 struct Options {
+    excluded_paths: Vec<String>,
     repository: Option<String>,
     local_path: Option<PathBuf>,
     root: String,
@@ -25,6 +26,7 @@ struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
+            excluded_paths: vec![],
             repository: None,
             local_path: None,
             root: String::new(),
@@ -45,6 +47,8 @@ impl Default for Options {
 enum Call {
     Sync {
         #[serde(default)]
+        pin: bool,
+        #[serde(default)]
         revision: Option<String>,
         #[serde(default)]
         token_provider_failed: bool,
@@ -52,6 +56,12 @@ enum Call {
     Read {
         path: String,
         #[serde(default)]
+        revision: Option<String>,
+    },
+    Snapshot {
+        revision: Option<String>,
+    },
+    InspectCandidate {
         revision: Option<String>,
     },
     List {
@@ -74,6 +84,12 @@ enum Call {
     Validate {
         #[serde(default)]
         revision: Option<String>,
+    },
+    UpsertProposal {
+        request: crate::UpsertRequest,
+    },
+    ProposalStatus {
+        number: u64,
     },
     Propose {
         request: WriteRequest,
@@ -110,6 +126,7 @@ impl Repository {
         config.limits = options.limits;
         config.allow_proposals = options.allow_proposals;
         config.allow_direct = options.allow_direct;
+        config.excluded_paths = options.excluded_paths;
         let cache = options
             .cache_dir
             .or_else(|| std::env::var_os("RAAD_CACHE_DIR").map(PathBuf::from))
@@ -147,6 +164,7 @@ impl Repository {
             Call::Sync {
                 revision,
                 token_provider_failed,
+                pin,
             } => {
                 if token_provider_failed {
                     // Run through the normal sync failure path so cached status also
@@ -155,7 +173,17 @@ impl Repository {
                         Err(Error::Permission("token provider failed".into()))
                     })));
                 }
-                serde_json::to_value(mount.sync(revision.as_deref())?)?
+                serde_json::to_value(if pin {
+                    mount.sync_pinned(revision.as_deref())?
+                } else {
+                    mount.sync(revision.as_deref())?
+                })?
+            }
+            Call::Snapshot { revision } => {
+                serde_json::to_value(mount.snapshot(revision.as_deref())?)?
+            }
+            Call::InspectCandidate { revision } => {
+                serde_json::to_value(mount.inspect_candidate(revision.as_deref())?)?
             }
             Call::Read { path, revision } => {
                 serde_json::to_value(mount.read(&path, revision.as_deref())?)?
@@ -171,6 +199,12 @@ impl Repository {
             Call::Validate { revision } => {
                 mount.validate(revision.as_deref())?;
                 json!(true)
+            }
+            Call::UpsertProposal { request } => {
+                serde_json::to_value(mount.upsert_proposal(request)?)?
+            }
+            Call::ProposalStatus { number } => {
+                serde_json::to_value(mount.proposal_status(number)?)?
             }
             Call::Propose { request } => serde_json::to_value(mount.propose(request)?)?,
             Call::Pin { sha, pinned } => {
@@ -189,6 +223,7 @@ impl Repository {
 /// Stable machine-readable error codes; bindings never infer types from display strings.
 pub fn error_json(error: Error) -> String {
     let code = match &error {
+        Error::Unsupported(_) => "unsupported_feature",
         Error::InvalidPath(_) => "invalid_path",
         Error::NotFound(_) => "not_found",
         Error::CacheMiss(_) => "cache_miss",

@@ -96,6 +96,9 @@ import raad._native
 from raad import Repository
 repo = Repository(local_path=os.environ["RAAD_TEST_REPO"], root="data", cache_dir=os.environ["RAAD_TEST_CACHE"])
 repo.sync()
+if hasattr(repo, "snapshot"):
+    assert repo.snapshot().files["binary.bin"] == bytes([0, 255, 128])
+    assert repo.inspect_candidate().root_exists
 file = repo.read("config.json")
 assert repo.read("binary.bin").data == bytes([0, 255, 128])
 print(json.dumps({"data":file.json(), "sha":file.commit_sha, "native":raad._native.__file__}))
@@ -128,6 +131,10 @@ import {Repository} from '@amanmibra/raad';
 const repo = await Repository.open({localPath:process.env.RAAD_TEST_REPO, root:'data', cacheDir:process.env.RAAD_TEST_CACHE});
 // No sync: read the snapshot created by the separately installed Python SDK.
 const file = await repo.read('config.json');
+if (typeof repo.snapshot === 'function') {
+  const snapshot = await repo.snapshot();
+  if (snapshot.commitSha !== file.commitSha) throw new Error('snapshot SHA mismatch');
+}
 if (Buffer.from((await repo.read('binary.bin')).data).toString('hex') !== '00ff80') throw new Error('binary mismatch');
 console.log(JSON.stringify({data:file.json(), sha:file.commitSha}));
 '''], cwd=node_app, env=environment))

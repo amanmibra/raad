@@ -176,3 +176,40 @@ test('host subprocesses remain usable between native Git operations', async t =>
     assert.equal((await reopened.read('settings.json')).json().enabled, true);
   }
 });
+
+test('candidate inspection, bulk snapshots and atomic pins use the native core', async t => {
+  const f = fixture(t);
+  mkdirSync(join(f.repo, 'data/build'));
+  writeFileSync(join(f.repo, 'data/build/invalid.json'), 'invalid'); f.commit();
+  const repo = await f.local({excludedPaths: ['build'], limits: {retainedRevisions: 1}});
+  const first = (await repo.sync(undefined, {pin: true})).activeSha;
+  const data = await repo.snapshot();
+  assert.equal(data.commitSha, first);
+  assert.equal(Buffer.from(data.files['policy.md']).toString(), 'Refund within 30 days.\n');
+  assert.equal(data.files['build/invalid.json'], undefined);
+  assert.deepEqual((await repo.status()).pinned, [first]);
+  writeFileSync(join(f.repo, 'data/settings.json'), 'invalid'); const broken = f.commit();
+  const candidate = await repo.inspectCandidate();
+  assert.equal(candidate.commitSha, broken); assert.equal(candidate.rootExists, true); assert.ok(candidate.issues.length);
+  assert.equal((await repo.snapshot()).commitSha, first);
+});
+
+test('proposal upsert uses expected-head CAS and returns typed PR identity', async t => {
+  const f = fixture(t), base = git(f.repo, 'rev-parse', 'HEAD');
+  const commit = 'a'.repeat(40);
+  const pr = {number: 7, html_url: 'https://github.com/fixture/private/pull/7', state: 'open',
+    head: {sha: commit, ref: 'app/sync'}, base: {sha: base, ref: 'main'}};
+  const api = await mock(t, [[200, {object: {sha: base}}], [404, {}], [200, []],
+    [200, {tree: {sha: 'base-tree'}}], [201, {sha: 'blob'}], [201, {sha: 'tree'}], [201, {sha: commit}],
+    [200, {object: {sha: base}}], [200, {node_id: 'repo-node'}], [200, {data: {updateRefs: {clientMutationId: null}}}],
+    [201, pr], [200, pr]]);
+  const repo = await f.remote({allowProposals: true, githubApiUrl: api.url, tokenProvider: async () => 'test-secret'});
+  await repo.sync();
+  const result = await repo.upsertProposal([{operation: 'put', path: 'policy.md', content: 'New policy'}],
+    {expectedBase: base, title: 'Update', branch: 'app/sync', operationId: 'operation-1'});
+  assert.equal(result.outcome, 'created'); assert.equal(result.pullRequestNumber, 7);
+  assert.equal(result.proposal.commitSha, commit);
+  const cas = api.requests.find(r => r.url === '/graphql').body.variables.input.refUpdates[0];
+  assert.equal(cas.beforeOid, '0'.repeat(40)); assert.equal(cas.afterOid, commit);
+  assert.equal((await repo.proposalStatus(7)).headSha, commit);
+});

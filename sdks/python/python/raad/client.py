@@ -9,7 +9,7 @@ from typing import Any, Awaitable, Callable, Sequence
 
 from . import _native
 from .errors import PermissionDeniedError, native_error
-from .models import Delete, HistoryEntry, Proposal, Put, ReadResult, Status, _write_request
+from .models import Candidate, Snapshot, ProposalOutcome, ProposalStatus, Delete, HistoryEntry, Proposal, Put, ReadResult, Status, _write_request
 
 TokenProvider = Callable[[], str]
 AsyncTokenProvider = Callable[[], str | Awaitable[str]]
@@ -36,12 +36,12 @@ class Repository:
         validation: dict[str, Any] | None = None, limits: dict[str, Any] | None = None,
         allow_proposals: bool = False, allow_direct: bool = False,
         anonymous: bool = False, token_provider: TokenProvider | None = None,
-        github_api_url: str | None = None,
+        github_api_url: str | None = None, excluded_paths: Sequence[str] = (),
     ):
         if anonymous and token_provider is not None:
             raise ValueError("choose anonymous access or a token provider")
         options: dict[str, Any] = {
-            "repository": repository, "local_path": os.fspath(local_path) if local_path is not None else None,
+            "excluded_paths": list(excluded_paths), "repository": repository, "local_path": os.fspath(local_path) if local_path is not None else None,
             "root": root, "branch": branch, "cache_dir": os.fspath(cache_dir) if cache_dir is not None else None,
             "refresh_seconds": refresh_seconds, "allow_proposals": allow_proposals,
             "allow_direct": allow_direct, "anonymous": anonymous, "github_api_url": github_api_url,
@@ -65,7 +65,7 @@ class Repository:
 
     def _call(self, request: dict[str, Any]) -> Any:
         token = None
-        if self._remote and request["method"] in ("sync", "propose") and self._token_provider is not None:
+        if self._remote and request["method"] in ("sync", "propose", "inspect_candidate", "upsert_proposal", "proposal_status") and self._token_provider is not None:
             try:
                 token = _check_token(self._token_provider())
             except Exception:
@@ -74,8 +74,25 @@ class Repository:
                 request["token_provider_failed"] = True
         return self._call_native(request, token)
 
-    def sync(self, revision: str | None = None) -> Status:
-        return Status._from_native(self._call({"method": "sync", "revision": revision}))
+    def sync(self, revision: str | None = None, *, pin: bool = False) -> Status:
+        return Status._from_native(self._call({"method": "sync", "revision": revision, "pin": pin}))
+
+    def snapshot(self, revision: str | None = None) -> Snapshot:
+        return Snapshot._from_native(self._call({"method": "snapshot", "revision": revision}))
+
+    def inspect_candidate(self, revision: str | None = None) -> Candidate:
+        return Candidate._from_native(self._call({"method": "inspect_candidate", "revision": revision}))
+
+    def proposal_status(self, number: int) -> ProposalStatus:
+        return ProposalStatus(**self._call({"method": "proposal_status", "number": number}))
+
+    def upsert_proposal(self, changes: Sequence[Put | Delete], *, expected_base: str,
+                              title: str, branch: str, operation_id: str,
+                              expected_head: str | None = None, body: str = "") -> ProposalOutcome:
+        request = _write_request(changes, expected_base, title, body, "proposal")
+        return ProposalOutcome._from_native(self._call({"method": "upsert_proposal", "request": {
+            "request": request, "branch": branch, "expected_head": expected_head, "operation_id": operation_id,
+        }}))
 
     def read(self, path: str, revision: str | None = None) -> ReadResult:
         return ReadResult._from_native(self._call({"method": "read", "path": path, "revision": revision}))
@@ -139,7 +156,7 @@ class AsyncRepository:
 
     async def _call(self, request: dict[str, Any]) -> Any:
         token = None
-        if self._repository._remote and request["method"] in ("sync", "propose") and self._token_provider is not None:
+        if self._repository._remote and request["method"] in ("sync", "propose", "inspect_candidate", "upsert_proposal", "proposal_status") and self._token_provider is not None:
             try:
                 # Blocking providers also run off the host's event loop.
                 value = await asyncio.to_thread(self._token_provider)
@@ -150,8 +167,25 @@ class AsyncRepository:
                 request["token_provider_failed"] = True
         return await asyncio.to_thread(self._repository._call_native, request, token)
 
-    async def sync(self, revision: str | None = None) -> Status:
-        return Status._from_native(await self._call({"method": "sync", "revision": revision}))
+    async def sync(self, revision: str | None = None, *, pin: bool = False) -> Status:
+        return Status._from_native(await self._call({"method": "sync", "revision": revision, "pin": pin}))
+
+    async def snapshot(self, revision: str | None = None) -> Snapshot:
+        return Snapshot._from_native(await self._call({"method": "snapshot", "revision": revision}))
+
+    async def inspect_candidate(self, revision: str | None = None) -> Candidate:
+        return Candidate._from_native(await self._call({"method": "inspect_candidate", "revision": revision}))
+
+    async def proposal_status(self, number: int) -> ProposalStatus:
+        return ProposalStatus(**await self._call({"method": "proposal_status", "number": number}))
+
+    async def upsert_proposal(self, changes: Sequence[Put | Delete], *, expected_base: str,
+                              title: str, branch: str, operation_id: str,
+                              expected_head: str | None = None, body: str = "") -> ProposalOutcome:
+        request = _write_request(changes, expected_base, title, body, "proposal")
+        return ProposalOutcome._from_native(await self._call({"method": "upsert_proposal", "request": {
+            "request": request, "branch": branch, "expected_head": expected_head, "operation_id": operation_id,
+        }}))
 
     async def read(self, path: str, revision: str | None = None) -> ReadResult:
         return ReadResult._from_native(await self._call({"method": "read", "path": path, "revision": revision}))

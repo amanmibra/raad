@@ -37,3 +37,11 @@ The shared internal binding surface dispatches typed SDK operations to the same 
 Credentials are supplied per sync/write operation. Host token callbacks run in the language wrapper before native work; a temporary mount clone receives that token without changing cache identity or persisting credentials. Reads do not resolve a token or sync implicitly. Normal core write authorization still applies. Caches are interoperable across Rust, CLI, Python, and Node with the same mount and validation settings. See [SDK installation and runtime behavior](../sdks/README.md).
 
 Subprocess timeouts poll individual child processes instead of registering a global SIGCHLD handler. This preserves the host runtime's child-process handling when the core is embedded in Node/libuv or Python/asyncio. Unix process-group cleanup and timeout/output bounds still apply.
+
+## Host sync operations
+
+The 0.1.2 source API adds candidate inspection without activation and a bulk validated snapshot read under one local lock. Atomic sync-and-pin protects a selected revision before retention pruning. Excluded path prefixes are part of mount cache identity; their blobs aren't fetched or validated, and writes to them are rejected. Tree listings and Git metadata may still include them.
+
+Stable proposal branches use a persisted operation identity, an expected base and an expected previous machine head. Candidate validation finishes before remote writes. GraphQL `updateRefs.beforeOid` publishes with an atomic head check. Recovery verifies the operation fingerprint, parent, scoped contents and changed paths; unknown or human-edited branches fail. No diff causes no remote mutation. The host owns durable operation storage and retry scheduling. The existing CLI and MCP interfaces keep their current permission model.
+
+Native integration tests use authenticated loopback GitHub APIs backed by actual Git objects. Live PAT/App permissions and branch protection need deployment-specific verification; a simulator can't prove those policies.

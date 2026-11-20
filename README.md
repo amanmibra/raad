@@ -35,7 +35,7 @@ await repo.sync();
 console.log((await repo.read('agent.schema.json')).json());
 ```
 
-For sopops and other async hosts, follow the [application walkthrough](examples/sdk/README.md). Rust apps can use the [library directly](examples/local.rs).
+For sopops and other async hosts, follow the [application walkthrough](examples/sdk/README.md). Rust apps can use the [library directly](examples/local.rs). The 0.1.2 source build also provides [bulk snapshots and recoverable PR updates](sdks/README.md#sync-integrations-012-source-api) for sync integrations.
 
 ## Try it
 

@@ -56,3 +56,22 @@ npm test --prefix sdks/typescript
 ```
 
 Tests use temporary Git repositories and authenticated mock GitHub APIs. They don't mutate customer repositories. CI builds and installs artifacts for Linux x86-64 (Ubuntu 22.04/glibc 2.35 baseline) and macOS arm64; other targets aren't claimed as verified.
+
+## Sync integrations (0.1.2 source API)
+
+These additions are available from this checkout. Published 0.1.1 packages don't include them yet.
+
+| Python / TypeScript | Use |
+|---|---|
+| `inspect_candidate()` / `inspectCandidate()` | Fetch bounded raw files, SHA, folder existence and validation issues without activating the candidate. Useful for import previews and repairs. |
+| `snapshot(sha)` | Load every validated file in one local read. Returns bytes and executable paths. The normal response limit applies. |
+| `sync(pin=True)` / `sync(undefined, {pin: true})` | Sync and pin under one cache lock. Historical sync still doesn't activate. |
+| `excluded_paths=["build"]` / `excludedPaths: ['build']` | Skip paths before fetching blobs or validation. Exclusions have a separate cache identity and reject writes to those paths. |
+| `upsert_proposal(...)` / `upsertProposal(...)` | Create or update a stable PR branch with an expected source SHA, expected proposal head and persistent operation ID. |
+| `proposal_status(number)` / `proposalStatus(number)` | Read an open, closed or merged PR in the mounted repository. |
+
+Persist the operation ID and exact request before sending a proposal. Retry that same request after an uncertain result. raad checks its commit marker, single parent, mounted contents and changed paths before recovering it. Use the returned commit as `expected_head` / `expectedHead` for the next edit. An unrecognized branch or a human edit raises a conflict. A closed PR stays closed when recovering its operation; a new operation can create another PR.
+
+A request matching the base returns `unchanged` without remote mutations. It may report an existing PR; it doesn't close it. Other results are `created` or `updated`, with proposal details and PR identity. Branch updates use GitHub's [atomic expected-OID check](https://docs.github.com/en/graphql/reference/git#updaterefs). Branch protection and token permissions still apply.
+
+`propose` and `upsert_proposal` can repair an invalid or missing mounted folder, provided the complete resulting candidate validates. Inspection doesn't make those raw files readable as a validated snapshot. Token callbacks also run for inspection, upserts and PR status, never for local snapshots. `UnsupportedFeatureError` identifies unsupported Git tree layouts and is a subtype of `ValidationError` in both SDKs. MCP tools and write permissions are unchanged.

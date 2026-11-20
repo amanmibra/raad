@@ -154,7 +154,7 @@ fn symlinks_and_mount_ancestor_symlinks_are_rejected() {
     std::os::unix::fs::symlink("../secret.txt", f.repo.path().join("sops/leak")).unwrap();
     git(f.repo.path(), &["add", "."]);
     git(f.repo.path(), &["commit", "-m", "symlink"]);
-    assert!(matches!(f.mount.sync(None), Err(Error::Validation(_))));
+    assert!(matches!(f.mount.sync(None), Err(Error::Unsupported(_))));
     let config = MountConfig::local(f.repo.path(), "sops/leak").unwrap();
     let mount = Mount::open(config, f.cache.path(), Credentials::Anonymous).unwrap();
     assert!(mount.sync(None).is_err());
@@ -311,4 +311,50 @@ fn interrupted_sync_cannot_replace_active_snapshot() {
     );
     fs::remove_file(hold).unwrap();
     assert_ne!(mount.sync(None).unwrap().active_sha.unwrap(), old);
+}
+
+#[test]
+fn candidate_inspection_is_raw_and_never_activates() {
+    let f = Fixture::new();
+    let first = f.mount.sync_pinned(None).unwrap().active_sha.unwrap();
+    let invalid = f.commit("sops/config.json", b"broken JSON");
+    let candidate = f.mount.inspect_candidate(None).unwrap();
+    assert_eq!(candidate.commit_sha, invalid);
+    assert!(candidate.root_exists && !candidate.issues.is_empty());
+    assert_eq!(f.mount.snapshot(None).unwrap().commit_sha, first);
+    assert!(f.mount.status().unwrap().pinned.contains(&first));
+    let missing = Mount::open(
+        MountConfig::local(f.repo.path(), "missing").unwrap(),
+        f.cache.path(),
+        Credentials::Anonymous,
+    )
+    .unwrap();
+    let candidate = missing.inspect_candidate(None).unwrap();
+    assert!(!candidate.root_exists);
+    assert!(candidate.files.is_empty());
+    assert!(matches!(missing.snapshot(None), Err(Error::CacheMiss(_))));
+}
+
+#[test]
+fn exclusions_apply_before_validation_and_have_separate_cache_identity() {
+    let f = Fixture::new();
+    std::fs::create_dir(f.repo.path().join("sops/build")).unwrap();
+    f.commit("sops/build/broken.json", b"invalid");
+    let mut config = f.mount.config().clone();
+    config.excluded_paths = vec!["build".into()];
+    let filtered = Mount::open(config, f.cache.path(), Credentials::Anonymous).unwrap();
+    assert_ne!(filtered.cache_directory(), f.mount.cache_directory());
+    filtered.sync_pinned(None).unwrap();
+    assert!(
+        !filtered
+            .snapshot(None)
+            .unwrap()
+            .files
+            .contains_key("build/broken.json")
+    );
+    assert!(matches!(f.mount.sync(None), Err(Error::Validation(_))));
+    assert!(matches!(
+        filtered.read("build/broken.json", None),
+        Err(Error::NotFound(_))
+    ));
 }

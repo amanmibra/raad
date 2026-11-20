@@ -43,6 +43,9 @@ impl Default for Limits {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MountConfig {
+    /// Trusted mount-relative path prefixes omitted before materialization and validation.
+    #[serde(default)]
+    pub excluded_paths: Vec<String>,
     pub name: String,
     pub source: Source,
     #[serde(default)]
@@ -84,6 +87,7 @@ impl MountConfig {
             .to_str()
             .ok_or_else(|| Error::InvalidPath("non UTF-8 directory".into()))?;
         Ok(Self {
+            excluded_paths: vec![],
             name: "default".into(),
             source: Source::Local { path: top },
             branch: None,
@@ -98,6 +102,7 @@ impl MountConfig {
     pub fn github(repository: &str, root: &str) -> Result<Self> {
         validate_repository(repository)?;
         Ok(Self {
+            excluded_paths: vec![],
             name: "default".into(),
             source: Source::Github {
                 repository: repository.into(),
@@ -180,11 +185,20 @@ pub struct HistoryEntry {
     pub active: bool,
     pub pinned: bool,
 }
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Snapshot {
-    commit_sha: String,
-    files: BTreeMap<String, FileData>,
+pub struct Snapshot {
+    pub commit_sha: String,
+    pub files: BTreeMap<String, FileData>,
+}
+/// Explicit, unactivated source inspection. Files may fail validation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Candidate {
+    pub commit_sha: String,
+    pub branch: String,
+    pub root_exists: bool,
+    pub files: BTreeMap<String, FileData>,
+    pub issues: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -210,6 +224,11 @@ impl Mount {
         credentials: Credentials,
     ) -> Result<Self> {
         config.path = safe_path(&config.path, true)?;
+        config.excluded_paths = config
+            .excluded_paths
+            .iter()
+            .map(|p| safe_path(p, false))
+            .collect::<Result<_>>()?;
         if let Source::Github { repository } = &config.source {
             validate_repository(repository)?;
         }
@@ -233,6 +252,7 @@ impl Mount {
             &config.branch,
             &config.path,
             &config.validation,
+            &config.excluded_paths,
             config.limits.file_bytes,
             config.limits.mount_bytes,
             config.limits.max_files,
@@ -381,6 +401,13 @@ impl Mount {
     /// Explicit synchronization. Failed candidates preserve the previous snapshot and record status.
     /// `revision` fetches/validates a historical SHA without activating it.
     pub fn sync(&self, revision: Option<&str>) -> Result<Status> {
+        self.sync_options(revision, false)
+    }
+    /// Sync and retain the selected revision under the same exclusive cache lock.
+    pub fn sync_pinned(&self, revision: Option<&str>) -> Result<Status> {
+        self.sync_options(revision, true)
+    }
+    fn sync_options(&self, revision: Option<&str>, pin: bool) -> Result<Status> {
         if revision.is_some_and(|s| !valid_sha(s)) {
             return Err(Error::InvalidPath(
                 "revision must be a full lowercase commit SHA".into(),
@@ -392,6 +419,12 @@ impl Mount {
         let outcome = self.sync_candidate(revision, &mut state);
         match outcome {
             Ok(()) => {
+                if pin {
+                    let selected = revision
+                        .or(state.active_sha.as_deref())
+                        .ok_or_else(|| Error::CacheMiss("sync result".into()))?;
+                    state.pinned.insert(selected.to_owned());
+                }
                 if revision.is_none() {
                     state.last_error = None;
                 }
@@ -407,6 +440,18 @@ impl Mount {
         }
     }
     fn sync_candidate(&self, revision: Option<&str>, state: &mut Status) -> Result<()> {
+        let (sha, branch, token) = self.fetch_revision(revision)?;
+        self.activate_candidate(revision, state, sha, branch, token)
+    }
+    pub(crate) fn fetch_revision(
+        &self,
+        revision: Option<&str>,
+    ) -> Result<(String, String, Option<String>)> {
+        if revision.is_some_and(|s| !valid_sha(s)) {
+            return Err(Error::InvalidPath(
+                "revision must be a full lowercase commit SHA".into(),
+            ));
+        }
         self.check_cache_size()?;
         let mut token = None;
         let branch;
@@ -501,6 +546,16 @@ impl Mount {
         if !valid_sha(&sha) {
             return Err(Error::Corrupt("Git returned invalid SHA".into()));
         }
+        Ok((sha, branch, token))
+    }
+    fn activate_candidate(
+        &self,
+        revision: Option<&str>,
+        state: &mut Status,
+        sha: String,
+        branch: String,
+        token: Option<String>,
+    ) -> Result<()> {
         let already_validated =
             state.digests.contains_key(&sha) && self.load_snapshot(&sha, state).is_ok();
         let snapshot = if already_validated {
@@ -553,7 +608,81 @@ impl Mount {
         }
         Ok(())
     }
+    pub(crate) fn excluded(&self, path: &str) -> bool {
+        self.config
+            .excluded_paths
+            .iter()
+            .any(|prefix| path == prefix || path.starts_with(&format!("{prefix}/")))
+    }
+    fn mount_exists(&self, sha: &str) -> Result<bool> {
+        let mut prefix = String::new();
+        for part in self.config.path.split('/').filter(|p| !p.is_empty()) {
+            if !prefix.is_empty() {
+                prefix.push('/');
+            }
+            prefix.push_str(part);
+            let kind =
+                match self.text_git(&["cat-file", "-t", &format!("{sha}:{prefix}")], false, None) {
+                    Ok(kind) => kind,
+                    Err(Error::Process(_)) => return Ok(false),
+                    Err(e) => return Err(e),
+                };
+            if kind != "tree" {
+                return Err(Error::InvalidPath(
+                    "mount ancestors must be Git trees".into(),
+                ));
+            }
+        }
+        Ok(true)
+    }
+    pub(crate) fn candidate_files(
+        &self,
+        sha: &str,
+        token: Option<&str>,
+    ) -> Result<(bool, BTreeMap<String, FileData>)> {
+        if !self.mount_exists(sha)? {
+            return Ok((false, BTreeMap::new()));
+        }
+        Ok((true, self.collect_snapshot(sha, token)?.files))
+    }
+    /// Fetch scoped source bytes without changing the active validated revision.
+    pub fn inspect_candidate(&self, revision: Option<&str>) -> Result<Candidate> {
+        let _lock = self.lock()?;
+        let (sha, branch, token) = self.fetch_revision(revision)?;
+        let (root_exists, files) = self.candidate_files(&sha, token.as_deref())?;
+        let issues = if !root_exists {
+            vec!["mount directory does not exist".into()]
+        } else {
+            self.config
+                .validation
+                .validate(&files)
+                .err()
+                .map(|e| vec![e.to_string()])
+                .unwrap_or_default()
+        };
+        self.check_cache_size()?;
+        let result = Candidate {
+            commit_sha: sha,
+            branch,
+            root_exists,
+            files,
+            issues,
+        };
+        self.bound_response(&result)?;
+        Ok(result)
+    }
+    /// Read all validated files once under the snapshot read lock, without network access.
+    pub fn snapshot(&self, revision: Option<&str>) -> Result<Snapshot> {
+        let _lock = self.read_lock()?;
+        let (commit_sha, files) = self.files_at_unlocked(revision)?;
+        let result = Snapshot { commit_sha, files };
+        self.bound_response(&result)?;
+        Ok(result)
+    }
     fn collect_snapshot(&self, sha: &str, token: Option<&str>) -> Result<Snapshot> {
+        if !self.mount_exists(sha)? {
+            return Err(Error::NotFound(self.config.path.clone()));
+        }
         let tree_spec = if self.config.path.is_empty() {
             format!("{sha}^{{tree}}")
         } else {
@@ -580,16 +709,19 @@ impl Mount {
             let (meta, path) = text
                 .split_once('\t')
                 .ok_or_else(|| Error::Corrupt("tree entry".into()))?;
+            let path = safe_path(path, false)?;
+            if self.excluded(&path) {
+                continue;
+            }
             let fields: Vec<_> = meta.split_whitespace().collect();
             if fields.len() != 3
                 || !["100644", "100755"].contains(&fields[0])
                 || fields[1] != "blob"
             {
-                return Err(Error::Validation(format!(
+                return Err(Error::Unsupported(format!(
                     "{path}: symlinks and submodules are unsupported"
                 )));
             }
-            let path = safe_path(path, false)?;
             if files.len() >= self.config.limits.max_files {
                 return Err(Error::Limit("file count".into()));
             }
@@ -751,7 +883,7 @@ impl Mount {
             Source::Github { repository } => repository.clone(),
         }
     }
-    fn check_cache_size(&self) -> Result<()> {
+    pub(crate) fn check_cache_size(&self) -> Result<()> {
         if disk_usage(&self.directory)? > self.config.limits.cache_bytes {
             return Err(Error::Limit(
                 "cache disk budget; prune or clear-cache".into(),

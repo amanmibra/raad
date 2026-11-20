@@ -36,13 +36,13 @@ pub struct Proposal {
     pub pull_request_url: Option<String>,
     pub mode: WriteMode,
 }
-struct Api {
+pub(crate) struct Api {
     base: Url,
     client: Client,
     token: String,
 }
 impl Api {
-    fn new(endpoint: &str, token: String) -> Result<Self> {
+    pub(crate) fn new(endpoint: &str, token: String) -> Result<Self> {
         let base =
             Url::parse(endpoint).map_err(|_| Error::Config("invalid API endpoint".into()))?;
         if !base.username().is_empty()
@@ -73,7 +73,21 @@ impl Api {
             token,
         })
     }
-    fn call(&self, method: Method, segments: &[&str], body: Option<Value>) -> Result<Value> {
+    pub(crate) fn call(
+        &self,
+        method: Method,
+        segments: &[&str],
+        body: Option<Value>,
+    ) -> Result<Value> {
+        self.call_query(method, segments, body, &[])
+    }
+    pub(crate) fn call_query(
+        &self,
+        method: Method,
+        segments: &[&str],
+        body: Option<Value>,
+        query: &[(&str, &str)],
+    ) -> Result<Value> {
         let mut url = self.base.clone();
         {
             let mut path = url
@@ -84,11 +98,14 @@ impl Api {
                 path.push(part);
             }
         }
+        if !query.is_empty() {
+            url.query_pairs_mut().extend_pairs(query.iter().copied());
+        }
         let mut req = self
             .client
             .request(method, url)
             .bearer_auth(&self.token)
-            .header("User-Agent", "raad/0.1.0")
+            .header("User-Agent", concat!("raad/", env!("CARGO_PKG_VERSION")))
             .header("Accept", "application/vnd.github+json")
             .header("X-GitHub-Api-Version", "2022-11-28");
         if let Some(body) = body {
@@ -148,7 +165,7 @@ impl Api {
         serde_json::from_slice(&bytes).map_err(|_| Error::Remote("invalid GitHub response".into()))
     }
 }
-fn field(value: &Value, key: &str) -> Result<String> {
+pub(crate) fn field(value: &Value, key: &str) -> Result<String> {
     value
         .get(key)
         .and_then(Value::as_str)
@@ -215,76 +232,14 @@ impl Mount {
         if current != request.expected_base {
             return Err(Error::Conflict(current));
         }
-        let (_, mut files) = self.files_at_unlocked(Some(&request.expected_base))?;
-        let mut seen = BTreeSet::new();
-        let mut entries = Vec::new();
-        let mut additions = Vec::new();
-        let mut deletions = Vec::new();
-        for change in &request.changes {
-            let path = match change {
-                Change::Put { path, .. } | Change::Delete { path } => safe_path(path, false)?,
-            };
-            if !seen.insert(path.clone()) {
-                return Err(Error::Config("duplicate change path".into()));
-            }
-            let full = if self.config.path.is_empty() {
-                path.clone()
-            } else {
-                format!("{}/{path}", self.config.path)
-            };
-            match change {
-                Change::Put { data, .. } => {
-                    let bytes = data.bytes()?;
-                    if bytes.len() > self.config.limits.file_bytes {
-                        return Err(Error::Limit("write file size".into()));
-                    }
-                    if bytes.starts_with(b"version https://git-lfs.github.com/spec/v1\n") {
-                        return Err(Error::Validation("Git LFS unsupported".into()));
-                    }
-                    if request.mode == WriteMode::Direct
-                        && (data.executable || files.get(&path).is_some_and(|f| f.executable))
-                    {
-                        return Err(Error::Config(
-                            "direct GraphQL writes only support regular nonexecutable files".into(),
-                        ));
-                    }
-                    files.insert(path, data.clone());
-                    entries.push(json!({"path": full, "mode": if data.executable { "100755" } else { "100644" }, "type": "blob", "raad_content": data.content}));
-                    additions.push(json!({"path": full, "contents": data.content}));
-                }
-                Change::Delete { .. } => {
-                    if files.remove(&path).is_none() {
-                        return Err(Error::NotFound(path));
-                    }
-                    entries
-                        .push(json!({"path": full, "mode": "100644", "type": "blob", "sha": null}));
-                    deletions.push(json!({"path": full}));
-                }
-            }
-        }
-        let mut total = 0usize;
-        for (path, file) in &files {
-            total = total
-                .checked_add(file.bytes()?.len())
-                .ok_or_else(|| Error::Limit("write mount size".into()))?;
-            if path
-                .split('/')
-                .scan(String::new(), |prefix, part| {
-                    if !prefix.is_empty() {
-                        prefix.push('/');
-                    }
-                    prefix.push_str(part);
-                    Some(prefix.clone())
-                })
-                .any(|p| p != *path && files.contains_key(&p))
-            {
-                return Err(Error::InvalidPath("file/directory collision".into()));
-            }
-        }
-        if total > self.config.limits.mount_bytes || files.len() > self.config.limits.max_files {
-            return Err(Error::Limit("write mount size or count".into()));
-        }
-        self.config.validation.validate(&files)?;
+        let prepared = self.prepare_changes(&request, self.base_files(&request.expected_base)?)?;
+        self.check_cache_size()?;
+        let Prepared {
+            files: _,
+            mut entries,
+            additions,
+            deletions,
+        } = prepared;
         if request.mode == WriteMode::Direct {
             // GitHub's atomic expectedHeadOid check avoids the compare/update race in REST refs.
             let result = api.call(Method::POST, &["graphql"], Some(json!({
@@ -373,4 +328,118 @@ impl Mount {
             mode: request.mode,
         })
     }
+    pub(crate) fn base_files(
+        &self,
+        sha: &str,
+    ) -> Result<std::collections::BTreeMap<String, FileData>> {
+        match self.files_at_unlocked(Some(sha)) {
+            Ok((_, files)) => Ok(files),
+            Err(Error::CacheMiss(_)) => {
+                let (_, _, token) = self.fetch_revision(Some(sha))?;
+                Ok(self.candidate_files(sha, token.as_deref())?.1)
+            }
+            Err(error) => Err(error),
+        }
+    }
+    pub(crate) fn prepare_changes(
+        &self,
+        request: &WriteRequest,
+        mut files: std::collections::BTreeMap<String, FileData>,
+    ) -> Result<Prepared> {
+        if !valid_sha(&request.expected_base)
+            || request.title.trim().is_empty()
+            || request.title.len() > 256
+            || request.body.len() > 65536
+            || request.changes.len() > self.config.limits.max_files
+        {
+            return Err(Error::Config("invalid or oversized write request".into()));
+        }
+        let mut seen = BTreeSet::new();
+        let mut entries = Vec::new();
+        let mut additions = Vec::new();
+        let mut deletions = Vec::new();
+        for change in &request.changes {
+            let path = match change {
+                Change::Put { path, .. } | Change::Delete { path } => safe_path(path, false)?,
+            };
+            if self.excluded(&path) {
+                return Err(Error::InvalidPath(
+                    "writes to excluded paths are forbidden".into(),
+                ));
+            }
+            if !seen.insert(path.clone()) {
+                return Err(Error::Config("duplicate change path".into()));
+            }
+            let full = if self.config.path.is_empty() {
+                path.clone()
+            } else {
+                format!("{}/{path}", self.config.path)
+            };
+            match change {
+                Change::Put { data, .. } => {
+                    let bytes = data.bytes()?;
+                    if bytes.len() > self.config.limits.file_bytes {
+                        return Err(Error::Limit("write file size".into()));
+                    }
+                    if bytes.starts_with(b"version https://git-lfs.github.com/spec/v1\n") {
+                        return Err(Error::Validation("Git LFS unsupported".into()));
+                    }
+                    if request.mode == WriteMode::Direct
+                        && (data.executable || files.get(&path).is_some_and(|f| f.executable))
+                    {
+                        return Err(Error::Config(
+                            "direct GraphQL writes only support regular nonexecutable files".into(),
+                        ));
+                    }
+                    files.insert(path, data.clone());
+                    entries.push(json!({"path": full, "mode": if data.executable { "100755" } else { "100644" }, "type": "blob", "raad_content": data.content}));
+                    additions.push(json!({"path": full, "contents": data.content}));
+                }
+                Change::Delete { .. } => {
+                    if files.remove(&path).is_none() {
+                        return Err(Error::NotFound(path));
+                    }
+                    entries
+                        .push(json!({"path": full, "mode": "100644", "type": "blob", "sha": null}));
+                    deletions.push(json!({"path": full}));
+                }
+            }
+        }
+        let mut total = 0usize;
+        for (path, file) in &files {
+            total = total
+                .checked_add(file.bytes()?.len())
+                .ok_or_else(|| Error::Limit("write mount size".into()))?;
+            if path
+                .split('/')
+                .scan(String::new(), |prefix, part| {
+                    if !prefix.is_empty() {
+                        prefix.push('/');
+                    }
+                    prefix.push_str(part);
+                    Some(prefix.clone())
+                })
+                .any(|p| p != *path && files.contains_key(&p))
+            {
+                return Err(Error::InvalidPath("file/directory collision".into()));
+            }
+        }
+        if total > self.config.limits.mount_bytes || files.len() > self.config.limits.max_files {
+            return Err(Error::Limit("write mount size or count".into()));
+        }
+        self.config.validation.validate(&files)?;
+        Ok(Prepared {
+            files,
+            entries,
+            additions,
+            deletions,
+        })
+    }
+}
+
+pub(crate) struct Prepared {
+    pub files: std::collections::BTreeMap<String, FileData>,
+    pub entries: Vec<Value>,
+    pub additions: Vec<Value>,
+    pub deletions: Vec<Value>,
 }
